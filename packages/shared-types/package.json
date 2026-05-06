@@ -1,0 +1,37 @@
+{
+  "name": "@simple-journal/shared-types",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./domain": {
+      "types": "./dist/domain.d.ts",
+      "import": "./dist/domain.js"
+    },
+    "./api": {
+      "types": "./dist/api-contracts.d.ts",
+      "import": "./dist/api-contracts.js"
+    },
+    "./crdt": {
+      "types": "./dist/crdt-schema.d.ts",
+      "import": "./dist/crdt-schema.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,47 @@
+name: shared-types-check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/**"
+      - "tsconfig.base.json"
+      - "pnpm-workspace.yaml"
+      - "package.json"
+      - ".github/workflows/shared-types-check.yml"
+  pull_request:
+    paths:
+      - "packages/**"
+      - "tsconfig.base.json"
+      - "pnpm-workspace.yaml"
+      - "package.json"
+      - ".github/workflows/shared-types-check.yml"
+
+jobs:
+  typecheck:
+    name: typecheck + build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm --filter "./packages/*" build
+
+      - name: Typecheck packages
+        run: pnpm --filter "./packages/*" typecheck

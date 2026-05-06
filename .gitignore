@@ -1,0 +1,94 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+.svelte-kit/
+.turbo/
+*.tsbuildinfo
+
+# Logs
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Env files
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# IDE / Editor
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# OS
+ehthumbs.db
+Desktop.ini
+
+# Cloudflare
+.wrangler/
+.dev.vars
+.dev.vars.local
+worker-configuration.d.ts
+
+# Testing
+coverage/
+.nyc_output/
+
+# Local secrets
+*.pem
+*.key
+*.p8
+*.p12
+*.mobileprovision
+*.cer
+*.certSigningRequest
+service-account*.json
+firebase-admin*.json
+
+# iOS / Xcode
+ios/build/
+ios/DerivedData/
+ios/*.xcworkspace/xcuserdata/
+ios/*.xcodeproj/xcuserdata/
+ios/*.xcodeproj/project.xcworkspace/xcuserdata/
+ios/Pods/
+
+# fastlane
+ios/fastlane/report.xml
+ios/fastlane/Preview.html
+ios/fastlane/screenshots/**/*.png
+ios/fastlane/test_output
+ios/fastlane/README.md
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/captures/
+android/.externalNativeBuild/
+android/.cxx/
+android/*.keystore
+android/*.jks
+android/keystore.properties
+
+# Generated types
+packages/shared-types/dist/
+packages/shared-config/dist/
+
+# Misc
+tmp/
+.cache/
