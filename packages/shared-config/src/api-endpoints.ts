@@ -21,8 +21,8 @@ const ENDPOINTS: Record<Environment, ApiEndpoints> = {
     web: "http://localhost:5173",
   },
   dev: {
-    api: "https://simple-journal-api.workers.dev",
-    websocket: "wss://simple-journal-ws.workers.dev",
+    api: "https://simple-journal-api.tkdgusqkr-g.workers.dev",
+    websocket: "wss://simple-journal-api.tkdgusqkr-g.workers.dev",
     web: "https://simple-journal.pages.dev",
   },
   prod: {
