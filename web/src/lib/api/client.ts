@@ -1,4 +1,7 @@
-import { env } from "$env/dynamic/public";
+import {
+  PUBLIC_API_BASE_URL,
+  PUBLIC_ENVIRONMENT,
+} from "$env/static/public";
 import {
   getEndpoints,
   resolveEnvironment,
@@ -30,9 +33,9 @@ class ApiClient {
   private idToken: string | null = null;
 
   baseUrl(): string {
-    if (env.PUBLIC_API_BASE_URL) return env.PUBLIC_API_BASE_URL.replace(/\/$/, "");
-    const e = resolveEnvironment(env.PUBLIC_ENVIRONMENT);
-    return getEndpoints(e).api.replace(/\/$/, "");
+    if (PUBLIC_API_BASE_URL) return PUBLIC_API_BASE_URL.replace(/\/$/, "");
+    const env = resolveEnvironment(PUBLIC_ENVIRONMENT);
+    return getEndpoints(env).api.replace(/\/$/, "");
   }
 
   setIdToken(token: string | null): void {
