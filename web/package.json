@@ -1,0 +1,33 @@
+{
+  "name": "@simple-journal/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "deploy": "wrangler pages deploy .svelte-kit/cloudflare --project-name=simple-journal --branch=main",
+    "deploy:preview": "wrangler pages deploy .svelte-kit/cloudflare --project-name=simple-journal"
+  },
+  "dependencies": {
+    "@simple-journal/shared-config": "workspace:*",
+    "@simple-journal/shared-types": "workspace:*"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-cloudflare": "^7.2.8",
+    "@sveltejs/kit": "^2.15.1",
+    "@sveltejs/vite-plugin-svelte": "^5.0.3",
+    "@tailwindcss/forms": "^0.5.10",
+    "@types/node": "^22.10.2",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.0",
+    "svelte": "^5.16.6",
+    "svelte-check": "^4.1.4",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7",
+    "wrangler": "^4.0.0"
+  }
+}
