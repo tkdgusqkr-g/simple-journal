@@ -16,9 +16,10 @@ export interface Env {
   // Vars
   ENVIRONMENT: "local" | "dev" | "prod";
   WEB_ORIGIN: string;
-
-  // Secrets (set via `wrangler secret put` or GitHub Actions)
   FIREBASE_PROJECT_ID: string;
-  FIREBASE_CLIENT_EMAIL: string;
-  FIREBASE_PRIVATE_KEY: string;
+
+  // Reserved for Firebase Admin SDK (custom tokens, user mgmt). Not needed
+  // for ID-token verification, which only uses Google's public JWKS.
+  FIREBASE_CLIENT_EMAIL?: string;
+  FIREBASE_PRIVATE_KEY?: string;
 }

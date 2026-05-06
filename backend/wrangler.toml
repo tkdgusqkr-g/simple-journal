@@ -28,12 +28,14 @@ class_name = "CrdtRoom"
 tag = "v1"
 new_sqlite_classes = ["CrdtRoom"]
 
-# Vars (non-secret runtime config)
+# Vars (non-secret runtime config — visible in dashboard, embedded in script)
 [vars]
 ENVIRONMENT = "dev"
 WEB_ORIGIN = "https://simple-journal.pages.dev"
+# Firebase project id is public (also exposed in client SDK config); not a secret.
+FIREBASE_PROJECT_ID = "simple-journal-e6196"
 
-# Secrets (set via `wrangler secret put` or GitHub Actions):
-#   FIREBASE_PROJECT_ID
+# Secrets (only set if/when the Admin SDK is wired up; ID-token verification
+# uses the public JWKS and does not need them):
 #   FIREBASE_CLIENT_EMAIL
 #   FIREBASE_PRIVATE_KEY
