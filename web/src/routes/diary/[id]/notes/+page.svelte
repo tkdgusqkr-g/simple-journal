@@ -22,15 +22,10 @@
   // sessions are filtered out (Word-like clean canvas).
   let activeIds = $state<Set<string>>(new Set());
 
-  /** Pinned entry first (only one); rest sorted by date ascending. */
-  const sortedEntries = $derived.by(() => {
-    const pinned = entries.find((e) => e.isPinned);
-    const rest = entries
-      .filter((e) => !e.isPinned)
-      .slice()
-      .sort((a, b) => a.date.localeCompare(b.date));
-    return pinned ? [pinned, ...rest] : rest;
-  });
+  /** Plain date-ascending order. (Pin is no longer surfaced in the UI.) */
+  const sortedEntries = $derived(
+    entries.slice().sort((a, b) => a.date.localeCompare(b.date)),
+  );
 
   /** Hide empty entries unless they were created/visited this session. */
   const visibleEntries = $derived(
@@ -53,7 +48,15 @@
         cursor: cursor ?? undefined,
         limit: 30,
       });
-      entries = reset ? result.entries : [...entries, ...result.entries];
+      if (reset) {
+        entries = result.entries;
+      } else {
+        // Dedupe by id — pagination overlap would crash {#each (id)} with
+        // each_key_duplicate.
+        const have = new Set(entries.map((e) => e.id));
+        const newOnly = result.entries.filter((e) => !have.has(e.id));
+        entries = [...entries, ...newOnly];
+      }
       cursor = result.nextCursor;
       hasMore = result.nextCursor !== null;
     } catch (err) {
@@ -99,12 +102,17 @@
 
     if (!existing) {
       try {
-        existing = await entriesApi.upsert(diaryId, {
+        const created = await entriesApi.upsert(diaryId, {
           date,
           content: "",
           tags: [],
         });
-        entries = [...entries, existing];
+        // Dedupe — server may return an entry whose id we already have
+        // (e.g. raced with pagination loading the same date).
+        if (!entries.some((e) => e.id === created.id)) {
+          entries = [...entries, created];
+        }
+        existing = created;
       } catch (err) {
         error = err instanceof Error ? err.message : "failed to create entry";
         return;
@@ -167,30 +175,6 @@
     const d = String(today.getDate()).padStart(2, "0");
     await scrollToDate(`${y}-${m}-${d}`);
   }
-
-  /** Single-pin enforcement: pinning a new entry unpins any others. */
-  async function onTogglePin(entry: Entry) {
-    try {
-      if (entry.isPinned) {
-        const updated = await entriesApi.setPin(entry.id, false);
-        onEntryUpdated(updated);
-        return;
-      }
-      const others = entries.filter((e) => e.isPinned && e.id !== entry.id);
-      await Promise.all(others.map((e) => entriesApi.setPin(e.id, false)));
-      const updated = await entriesApi.setPin(entry.id, true);
-      const refreshed = await Promise.all(
-        others.map((e) => entriesApi.get(e.id)),
-      );
-      entries = entries.map((e) => {
-        if (e.id === updated.id) return updated;
-        const r = refreshed.find((x) => x.id === e.id);
-        return r ?? e;
-      });
-    } catch (err) {
-      error = err instanceof Error ? err.message : "pin failed";
-    }
-  }
 </script>
 
 <svelte:head>
@@ -223,7 +207,7 @@
         Tip: inside an entry, type <kbd class="rounded bg-slate-100 px-1 font-mono dark:bg-slate-800">/today</kbd>,
         <kbd class="rounded bg-slate-100 px-1 font-mono dark:bg-slate-800">/yesterday</kbd>, or
         <kbd class="rounded bg-slate-100 px-1 font-mono dark:bg-slate-800">/date</kbd>
-        to insert another day. To pin an entry, focus it and click the 📌 in the top-right.
+        to insert another day. Backspace at the start of an empty entry removes it.
       </p>
     </div>
   {:else}
@@ -234,7 +218,6 @@
           onUpdated={onEntryUpdated}
           onDeleted={onEntryDeleted}
           onSlashAction={onSlashAction}
-          onTogglePin={onTogglePin}
         />
       {/each}
     </div>

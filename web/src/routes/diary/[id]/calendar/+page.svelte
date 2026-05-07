@@ -143,7 +143,7 @@
         class="group relative flex min-h-[80px] flex-col bg-white p-2 text-left transition hover:bg-blue-50 sm:min-h-[110px] dark:bg-slate-900 dark:hover:bg-slate-800"
         class:opacity-50={!cell.inMonth}
       >
-        <div class="flex items-baseline justify-between">
+<div class="flex items-baseline justify-between">
           <span
             class={
               "text-sm font-semibold " +
@@ -152,9 +152,6 @@
           >
             {cell.date.getDate()}
           </span>
-          {#if entry?.isPinned}
-            <span class="text-amber-500 text-xs" aria-label="Pinned">📌</span>
-          {/if}
         </div>
 
         {#if entry}
