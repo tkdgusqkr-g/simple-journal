@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick } from "svelte";
+  import { tick, untrack } from "svelte";
   import { page } from "$app/state";
   import { authStore } from "$lib/auth/store.svelte";
   import { entriesApi } from "$lib/api/diaries";
@@ -73,12 +73,18 @@
     }
   });
 
-  // Honor #entry-YYYY-MM-DD on load.
+  // Honor #entry-YYYY-MM-DD on load. Wrap the scrollToDate call in
+  // untrack() so its `entries.find(...)` read isn't picked up as a dep —
+  // otherwise deleting the entry that the hash points to would re-fire
+  // this effect and re-create the very entry the user just removed.
   $effect(() => {
     if (loading) return;
     const hash = window.location.hash;
     if (hash.startsWith("#entry-")) {
-      void scrollToDate(hash.slice("#entry-".length));
+      const date = hash.slice("#entry-".length);
+      untrack(() => {
+        void scrollToDate(date);
+      });
     }
   });
 
@@ -154,11 +160,17 @@
   }
 
   function onEntryDeleted(id: string) {
+    const target = entries.find((e) => e.id === id);
     entries = entries.filter((e) => e.id !== id);
     if (activeIds.has(id)) {
       const next = new Set(activeIds);
       next.delete(id);
       activeIds = next;
+    }
+    // If the URL hash points to the entry we just removed, clear it so
+    // a refresh doesn't re-create the entry through the hash effect.
+    if (target && window.location.hash === `#entry-${target.date}`) {
+      window.history.replaceState({}, "", window.location.pathname);
     }
   }
 
