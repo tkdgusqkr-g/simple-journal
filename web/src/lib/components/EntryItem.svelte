@@ -18,9 +18,20 @@
     onUpdated?: (entry: Entry) => void;
     onDeleted?: (id: string) => void;
     onSlashAction?: (action: SlashAction) => void;
+    /** Move focus to the previous entry's textarea (cursor at end). */
+    onFocusPrev?: () => void;
+    /** Move focus to the next entry's textarea (cursor at start). */
+    onFocusNext?: () => void;
   }
 
-  let { entry, onUpdated, onDeleted, onSlashAction }: Props = $props();
+  let {
+    entry,
+    onUpdated,
+    onDeleted,
+    onSlashAction,
+    onFocusPrev,
+    onFocusNext,
+  }: Props = $props();
 
   // svelte-ignore state_referenced_locally
   let content = $state(entry.content);
@@ -116,19 +127,39 @@
   }
 
   function onTextareaKeydown(event: KeyboardEvent) {
-    // Backspace at the very start of an empty entry removes the entry —
-    // the natural way to undo a slash command (`/today`) you regret.
+    // Boundary navigation between entries — makes the feed feel like a
+    // single continuous text doc rather than a stack of isolated boxes.
     if (
       !slashOpen &&
-      event.key === "Backspace" &&
       textareaEl !== null &&
-      textareaEl.selectionStart === 0 &&
-      textareaEl.selectionEnd === 0 &&
-      content.length === 0
+      textareaEl.selectionStart === textareaEl.selectionEnd
     ) {
-      event.preventDefault();
-      void deleteSilently();
-      return;
+      const atStart = textareaEl.selectionStart === 0;
+      const atEnd = textareaEl.selectionStart === textareaEl.value.length;
+
+      if (event.key === "Backspace" && atStart) {
+        event.preventDefault();
+        if (content.length === 0) {
+          // Empty entry → delete it (undo a `/today` you regret).
+          void deleteSilently();
+        } else {
+          // Non-empty entry → step the caret into the previous entry's
+          // text. Don't delete (would lose content); the user can then
+          // keep backspacing in the previous entry.
+          onFocusPrev?.();
+        }
+        return;
+      }
+      if (event.key === "ArrowLeft" && atStart) {
+        event.preventDefault();
+        onFocusPrev?.();
+        return;
+      }
+      if (event.key === "ArrowRight" && atEnd) {
+        event.preventDefault();
+        onFocusNext?.();
+        return;
+      }
     }
 
     if (!slashOpen) return;
@@ -220,11 +251,11 @@
 
 <article
   id={`entry-${entry.date}`}
-  class="scroll-mt-24 py-4"
+  class="scroll-mt-24 pt-2"
   role="region"
   aria-label={`Entry for ${entry.date}`}
 >
-  <h2 class="mb-1.5 text-base font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+  <h2 class="mb-0.5 text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
     {formatLongDate(entry.date)}
   </h2>
 

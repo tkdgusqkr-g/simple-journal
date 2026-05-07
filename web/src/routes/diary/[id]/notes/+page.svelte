@@ -180,6 +180,30 @@
     }
   }
 
+  function focusEntryTextarea(date: string, position: "start" | "end") {
+    const el = document.getElementById(`entry-${date}`);
+    const ta = el?.querySelector("textarea") as HTMLTextAreaElement | null;
+    if (!ta) return;
+    ta.focus();
+    const pos = position === "end" ? ta.value.length : 0;
+    ta.setSelectionRange(pos, pos);
+    ta.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  function focusPrev(currentId: string) {
+    const list = visibleEntries;
+    const idx = list.findIndex((e) => e.id === currentId);
+    if (idx > 0) focusEntryTextarea(list[idx - 1]!.date, "end");
+  }
+
+  function focusNext(currentId: string) {
+    const list = visibleEntries;
+    const idx = list.findIndex((e) => e.id === currentId);
+    if (idx >= 0 && idx < list.length - 1) {
+      focusEntryTextarea(list[idx + 1]!.date, "start");
+    }
+  }
+
   async function startTodaysEntry() {
     const today = new Date();
     const y = today.getFullYear();
@@ -230,6 +254,8 @@
           onUpdated={onEntryUpdated}
           onDeleted={onEntryDeleted}
           onSlashAction={onSlashAction}
+          onFocusPrev={() => focusPrev(entry.id)}
+          onFocusNext={() => focusNext(entry.id)}
         />
       {/each}
     </div>
