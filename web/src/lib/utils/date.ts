@@ -7,6 +7,23 @@ export function todayIso(): string {
   return toIso(new Date());
 }
 
+export function yesterdayIso(): string {
+  return toIso(addDays(new Date(), -1));
+}
+
+export function addDays(d: Date, n: number): Date {
+  const out = new Date(d);
+  out.setDate(out.getDate() + n);
+  return out;
+}
+
+export const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+export function isValidIsoDate(s: string): boolean {
+  if (!ISO_DATE_RE.test(s)) return false;
+  const d = fromIso(s);
+  return toIso(d) === s; // round-trip catches things like 2026-02-30
+}
+
 export function toIso(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");

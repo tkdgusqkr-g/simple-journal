@@ -5,6 +5,7 @@
   import { entriesApi } from "$lib/api/diaries";
   import EntryItem from "$lib/components/EntryItem.svelte";
   import type { Entry } from "@simple-journal/shared-types/domain";
+  import type { SlashAction } from "$lib/utils/slash";
 
   const diaryId = $derived(page.params.id as string);
 
@@ -16,9 +17,26 @@
   let error = $state<string | null>(null);
   let sentinel: HTMLDivElement | undefined = $state();
 
-  // Strict date-desc order; the feed view is "by date", not "by pin".
-  const sortedEntries = $derived(
-    [...entries].sort((a, b) => b.date.localeCompare(a.date)),
+  // Entries created/visited during this session — they render even if
+  // empty so the user has a place to type. Empty entries from earlier
+  // sessions are filtered out (Word-like clean canvas).
+  let activeIds = $state<Set<string>>(new Set());
+
+  /** Pinned entry first (only one); rest sorted by date ascending. */
+  const sortedEntries = $derived.by(() => {
+    const pinned = entries.find((e) => e.isPinned);
+    const rest = entries
+      .filter((e) => !e.isPinned)
+      .slice()
+      .sort((a, b) => a.date.localeCompare(b.date));
+    return pinned ? [pinned, ...rest] : rest;
+  });
+
+  /** Hide empty entries unless they were created/visited this session. */
+  const visibleEntries = $derived(
+    sortedEntries.filter(
+      (e) => e.content.trim().length > 0 || activeIds.has(e.id),
+    ),
   );
 
   async function loadEntries(reset = true) {
@@ -52,12 +70,12 @@
     }
   });
 
-  // Honor #entry-YYYY-MM-DD on load — used by Calendar→Notes navigation.
+  // Honor #entry-YYYY-MM-DD on load.
   $effect(() => {
     if (loading) return;
     const hash = window.location.hash;
     if (hash.startsWith("#entry-")) {
-      void scrollToDate(hash.slice("#entry-".length), true);
+      void scrollToDate(hash.slice("#entry-".length));
     }
   });
 
@@ -76,34 +94,23 @@
     return () => obs.disconnect();
   });
 
-  async function scrollToDate(date: string, createIfMissing = true) {
-    let exists = entries.some((e) => e.date === date);
+  async function scrollToDate(date: string) {
+    let existing = entries.find((e) => e.date === date);
 
-    if (!exists && createIfMissing) {
+    if (!existing) {
       try {
-        const created = await entriesApi.upsert(diaryId, {
+        existing = await entriesApi.upsert(diaryId, {
           date,
           content: "",
           tags: [],
         });
-        entries = [...entries, created];
-        exists = true;
+        entries = [...entries, existing];
       } catch (err) {
         error = err instanceof Error ? err.message : "failed to create entry";
         return;
       }
     }
-    if (!exists) {
-      // Date is older than what's loaded — keep paging until we find it.
-      while (hasMore) {
-        await loadEntries(false);
-        if (entries.some((e) => e.date === date)) {
-          exists = true;
-          break;
-        }
-      }
-      if (!exists) return;
-    }
+    activeIds = new Set([...activeIds, existing.id]);
 
     await tick();
     const el = document.getElementById(`entry-${date}`);
@@ -111,7 +118,21 @@
       el.scrollIntoView({ behavior: "smooth", block: "start" });
       window.history.replaceState({}, "", `#entry-${date}`);
       const ta = el.querySelector("textarea") as HTMLTextAreaElement | null;
-      if (ta && ta.value === "") ta.focus();
+      if (ta) {
+        ta.focus();
+        ta.setSelectionRange(ta.value.length, ta.value.length);
+      }
+    } else if (hasMore) {
+      while (hasMore) {
+        await loadEntries(false);
+        if (entries.some((e) => e.date === date)) {
+          await tick();
+          const el2 = document.getElementById(`entry-${date}`);
+          el2?.scrollIntoView({ behavior: "smooth", block: "start" });
+          window.history.replaceState({}, "", `#entry-${date}`);
+          break;
+        }
+      }
     }
   }
 
@@ -121,6 +142,41 @@
 
   function onEntryDeleted(id: string) {
     entries = entries.filter((e) => e.id !== id);
+    if (activeIds.has(id)) {
+      const next = new Set(activeIds);
+      next.delete(id);
+      activeIds = next;
+    }
+  }
+
+  function onSlashAction(action: SlashAction) {
+    if (action.kind === "createDate") {
+      void scrollToDate(action.date);
+    }
+  }
+
+  /** Single-pin enforcement: pinning a new entry unpins any others. */
+  async function onTogglePin(entry: Entry) {
+    try {
+      if (entry.isPinned) {
+        const updated = await entriesApi.setPin(entry.id, false);
+        onEntryUpdated(updated);
+        return;
+      }
+      const others = entries.filter((e) => e.isPinned && e.id !== entry.id);
+      await Promise.all(others.map((e) => entriesApi.setPin(e.id, false)));
+      const updated = await entriesApi.setPin(entry.id, true);
+      const refreshed = await Promise.all(
+        others.map((e) => entriesApi.get(e.id)),
+      );
+      entries = entries.map((e) => {
+        if (e.id === updated.id) return updated;
+        const r = refreshed.find((x) => x.id === e.id);
+        return r ?? e;
+      });
+    } catch (err) {
+      error = err instanceof Error ? err.message : "pin failed";
+    }
   }
 </script>
 
@@ -135,28 +191,21 @@
     <p class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-100">
       {error}
     </p>
-  {:else if sortedEntries.length === 0}
-    <div class="mt-12 rounded-2xl border border-dashed border-slate-300 p-10 text-center text-sm text-slate-500 dark:border-slate-700">
-      <p>No entries yet.</p>
-      <p class="mt-2 text-xs">Tap “Today's entry” above to start writing.</p>
-    </div>
   {:else}
     <div>
-      {#each sortedEntries as entry (entry.id)}
+      {#each visibleEntries as entry (entry.id)}
         <EntryItem
           {entry}
           onUpdated={onEntryUpdated}
           onDeleted={onEntryDeleted}
+          onSlashAction={onSlashAction}
+          onTogglePin={onTogglePin}
         />
       {/each}
     </div>
     <div bind:this={sentinel} class="py-6 text-center text-xs text-slate-500">
       {#if loadingMore}
         Loading older entries…
-      {:else if hasMore}
-        Scroll to load more
-      {:else}
-        End of journal
       {/if}
     </div>
   {/if}
