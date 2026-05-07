@@ -204,6 +204,55 @@
     }
   }
 
+  /**
+   * Backspace at pos 0 of a non-empty entry: append its content to the
+   * previous entry, drop the current entry's date marker. Returns
+   * whether a merge actually happened (false if there's no prev entry).
+   */
+  function mergeWithPrev(currentId: string, currentContent: string): boolean {
+    const list = visibleEntries;
+    const idx = list.findIndex((e) => e.id === currentId);
+    if (idx <= 0) return false;
+    const prev = list[idx - 1]!;
+    const sep = prev.content && currentContent ? "\n\n" : "";
+    const merged = prev.content + sep + currentContent;
+    const mergePos = prev.content.length + sep.length;
+
+    // Optimistic local state — replace prev with merged content and
+    // drop the current entry. The UI updates immediately; the API
+    // calls happen in the background.
+    entries = entries
+      .map((e) => (e.id === prev.id ? { ...e, content: merged } : e))
+      .filter((e) => e.id !== currentId);
+    if (activeIds.has(currentId)) {
+      const next = new Set(activeIds);
+      next.delete(currentId);
+      activeIds = next;
+    }
+    if (window.location.hash === `#entry-${list[idx]!.date}`) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+
+    // Focus the previous entry at the seam, then fire the API.
+    void (async () => {
+      await tick();
+      focusEntryTextarea(prev.date, "end");
+      const ta = document.querySelector(
+        `#entry-${prev.date} textarea`,
+      ) as HTMLTextAreaElement | null;
+      if (ta) ta.setSelectionRange(mergePos, mergePos);
+      try {
+        await Promise.all([
+          entriesApi.update(prev.id, { content: merged }),
+          entriesApi.remove(currentId),
+        ]);
+      } catch {
+        // Server might already match — autosave will reconcile.
+      }
+    })();
+    return true;
+  }
+
   async function startTodaysEntry() {
     const today = new Date();
     const y = today.getFullYear();
@@ -256,6 +305,7 @@
           onSlashAction={onSlashAction}
           onFocusPrev={() => focusPrev(entry.id)}
           onFocusNext={() => focusNext(entry.id)}
+          onMergeWithPrev={(content) => mergeWithPrev(entry.id, content)}
         />
       {/each}
     </div>

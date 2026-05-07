@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import { ApiError } from "$lib/api/client";
   import { entriesApi } from "$lib/api/diaries";
   import { debounce } from "$lib/utils/debounce";
@@ -22,6 +22,11 @@
     onFocusPrev?: () => void;
     /** Move focus to the next entry's textarea (cursor at start). */
     onFocusNext?: () => void;
+    /** Backspace at pos 0 of a non-empty entry: hand the entry's
+     * content to the parent so it can be appended to the previous
+     * entry, then this entry is removed. Returns true if a merge
+     * happened (so the keypress was consumed). */
+    onMergeWithPrev?: (content: string) => boolean;
   }
 
   let {
@@ -31,6 +36,7 @@
     onSlashAction,
     onFocusPrev,
     onFocusNext,
+    onMergeWithPrev,
   }: Props = $props();
 
   // svelte-ignore state_referenced_locally
@@ -143,9 +149,20 @@
           // Empty entry → delete it (undo a `/today` you regret).
           void deleteSilently();
         } else {
-          // Non-empty entry → step the caret into the previous entry's
-          // text. Don't delete (would lose content); the user can then
-          // keep backspacing in the previous entry.
+          // Non-empty entry → merge content into the previous entry
+          // and remove this entry's date header. Like deleting a
+          // block boundary in Notion — the date marker disappears,
+          // the text survives. If there's no previous entry the
+          // parent returns false and we leave the textarea alone.
+          if (onMergeWithPrev) {
+            const merged = onMergeWithPrev(content);
+            if (merged) {
+              // EntryItem will be unmounted; nothing more to do.
+              return;
+            }
+          }
+          // No previous entry to merge into — fall back to plain
+          // navigation so the keystroke isn't a complete no-op.
           onFocusPrev?.();
         }
         return;
@@ -246,6 +263,23 @@
 
   onMount(() => {
     autoResize(textareaEl);
+  });
+
+  // When the parent rewrites our entry.content prop (e.g. another entry
+  // got merged into us via Backspace), pull the new content into our
+  // local state — but only when this textarea isn't focused, so we
+  // never clobber what the user is currently typing.
+  $effect(() => {
+    const incoming = entry.content;
+    untrack(() => {
+      const isFocused =
+        textareaEl !== null && document.activeElement === textareaEl;
+      if (!isFocused && incoming !== content && !deleted) {
+        content = incoming;
+        // After Svelte updates the DOM via bind:value, fix the height.
+        queueMicrotask(() => autoResize(textareaEl));
+      }
+    });
   });
 </script>
 
