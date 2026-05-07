@@ -110,7 +110,12 @@
         return;
       }
     }
-    activeIds = new Set([...activeIds, existing.id]);
+    // Only write the Set when the id is genuinely new — every assignment
+    // creates a fresh Set reference and would re-trigger this effect's
+    // entries.find() read, looping until the budget exceeds.
+    if (!activeIds.has(existing.id)) {
+      activeIds = new Set([...activeIds, existing.id]);
+    }
 
     await tick();
     const el = document.getElementById(`entry-${date}`);
