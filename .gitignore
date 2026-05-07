@@ -92,3 +92,4 @@ packages/shared-config/dist/
 # Misc
 tmp/
 .cache/
+.claude/

@@ -155,6 +155,14 @@
     }
   }
 
+  async function startTodaysEntry() {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, "0");
+    const d = String(today.getDate()).padStart(2, "0");
+    await scrollToDate(`${y}-${m}-${d}`);
+  }
+
   /** Single-pin enforcement: pinning a new entry unpins any others. */
   async function onTogglePin(entry: Entry) {
     try {
@@ -191,6 +199,28 @@
     <p class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-100">
       {error}
     </p>
+  {:else if visibleEntries.length === 0}
+    <div class="mt-16 flex flex-col items-center text-center">
+      <h2 class="text-lg font-medium text-slate-700 dark:text-slate-300">
+        Start your journal
+      </h2>
+      <p class="mt-2 max-w-sm text-sm text-slate-500">
+        Pick a date on the calendar, or jump straight in.
+      </p>
+      <button
+        type="button"
+        onclick={() => void startTodaysEntry()}
+        class="mt-6 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700"
+      >
+        Write today's entry
+      </button>
+      <p class="mt-8 max-w-sm text-xs text-slate-400">
+        Tip: inside an entry, type <kbd class="rounded bg-slate-100 px-1 font-mono dark:bg-slate-800">/today</kbd>,
+        <kbd class="rounded bg-slate-100 px-1 font-mono dark:bg-slate-800">/yesterday</kbd>, or
+        <kbd class="rounded bg-slate-100 px-1 font-mono dark:bg-slate-800">/date</kbd>
+        to insert another day. To pin an entry, focus it and click the 📌 in the top-right.
+      </p>
+    </div>
   {:else}
     <div>
       {#each visibleEntries as entry (entry.id)}

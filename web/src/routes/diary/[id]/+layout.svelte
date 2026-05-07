@@ -25,18 +25,15 @@
     if (authStore.status === "authenticated" && diaryId) void load();
   });
 
-  // Track which sub-page we're on so the toggle button shows the right label.
   const onCalendarPage = $derived(page.url.pathname.endsWith("/calendar"));
   const onNotesPage = $derived(page.url.pathname.includes("/notes"));
 
-  function goToOther() {
-    if (onCalendarPage) {
-      void goto(`/diary/${diaryId}/notes`);
-    } else {
-      void goto(`/diary/${diaryId}/calendar`);
-    }
+  function goToCalendar() {
+    if (!onCalendarPage) void goto(`/diary/${diaryId}/calendar`);
   }
-
+  function goToNotes() {
+    if (!onNotesPage) void goto(`/diary/${diaryId}/notes`);
+  }
   function goToToday() {
     void goto(`/diary/${diaryId}/notes#entry-${todayIso()}`);
   }
@@ -45,9 +42,9 @@
 <div class="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
   <div class="mx-auto max-w-5xl px-4 py-4 sm:px-6">
     <a href="/diary" class="text-xs text-slate-500 hover:underline">← All diaries</a>
-    <div class="mt-1 flex items-center justify-between gap-3">
-      <div>
-        <h1 class="text-2xl font-bold tracking-tight">
+    <div class="mt-1 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div class="min-w-0">
+        <h1 class="truncate text-2xl font-bold tracking-tight">
           {diary?.name ?? "…"}
         </h1>
         {#if diary}
@@ -56,21 +53,45 @@
           </p>
         {/if}
       </div>
-      <div class="flex items-center gap-2">
-        <button
-          type="button"
-          onclick={goToOther}
-          class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-          aria-pressed={onNotesPage}
+      <div class="flex flex-wrap items-center gap-2">
+        <div
+          role="tablist"
+          aria-label="View"
+          class="inline-flex rounded-xl border border-slate-200 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-900"
         >
-          {#if onCalendarPage}
-            <span aria-hidden="true">✏️</span>
-            Notes
-          {:else}
-            <span aria-hidden="true">📅</span>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={onCalendarPage}
+            onclick={goToCalendar}
+            class="rounded-lg px-3 py-1.5 text-sm font-medium transition"
+            class:bg-blue-600={onCalendarPage}
+            class:text-white={onCalendarPage}
+            class:text-slate-600={!onCalendarPage}
+            class:dark:text-slate-300={!onCalendarPage}
+            class:hover:bg-slate-100={!onCalendarPage}
+            class:dark:hover:bg-slate-800={!onCalendarPage}
+          >
+            <span aria-hidden="true" class="mr-1">📅</span>
             Calendar
-          {/if}
-        </button>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={onNotesPage}
+            onclick={goToNotes}
+            class="rounded-lg px-3 py-1.5 text-sm font-medium transition"
+            class:bg-blue-600={onNotesPage}
+            class:text-white={onNotesPage}
+            class:text-slate-600={!onNotesPage}
+            class:dark:text-slate-300={!onNotesPage}
+            class:hover:bg-slate-100={!onNotesPage}
+            class:dark:hover:bg-slate-800={!onNotesPage}
+          >
+            <span aria-hidden="true" class="mr-1">✏️</span>
+            Notes
+          </button>
+        </div>
         <button
           type="button"
           onclick={goToToday}

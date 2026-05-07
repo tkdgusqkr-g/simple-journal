@@ -32,8 +32,7 @@
 
   let saveStatus = $state<"idle" | "saving" | "saved" | "error">("idle");
   let errorMessage = $state<string | null>(null);
-  let textareaEl: HTMLTextAreaElement | undefined = $state();
-  let containerEl: HTMLElement | undefined = $state();
+  let textareaEl = $state<HTMLTextAreaElement | null>(null);
   let focused = $state(false);
   let hovered = $state(false);
 
@@ -64,20 +63,20 @@
     }
   }, 800);
 
-  function autoResize(el: HTMLTextAreaElement) {
+  function autoResize(el: HTMLTextAreaElement | null) {
+    if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
+    el.style.height = `${Math.max(el.scrollHeight, 28)}px`;
   }
 
-  function updateSlashState() {
+  function refreshSlashState() {
     if (!textareaEl) return;
-    const t = textareaEl;
-    const trig = detectSlashTrigger(t.value, t.selectionStart);
+    const trig = detectSlashTrigger(textareaEl.value, textareaEl.selectionStart);
     if (trig) {
       slashStart = trig.slashIndex;
       slashQuery = trig.query;
       slashSelectedIdx = 0;
-      slashPos = computeMenuPosition(t);
+      slashPos = computeMenuPosition(textareaEl);
     } else {
       closeSlashMenu();
     }
@@ -90,31 +89,25 @@
     slashSelectedIdx = 0;
   }
 
-  /** Position the popup just below the line containing the slash. */
   function computeMenuPosition(ta: HTMLTextAreaElement): {
     top: number;
     left: number;
   } {
     const rect = ta.getBoundingClientRect();
-    return {
-      top: rect.bottom + 4,
-      left: rect.left + 8,
-    };
+    return { top: rect.bottom + 4, left: rect.left + 8 };
   }
 
-  function onContentInput(event: Event) {
-    const ta = event.target as HTMLTextAreaElement;
-    content = ta.value;
-    autoResize(ta);
+  function onContentInput() {
+    if (!textareaEl) return;
+    content = textareaEl.value;
+    autoResize(textareaEl);
     save();
-    updateSlashState();
+    refreshSlashState();
   }
 
   function onTextareaKeydown(event: KeyboardEvent) {
     if (!slashOpen) return;
-
     if (slashShowDatePicker) {
-      // Let the calendar handle its own clicks; just allow Escape to close.
       if (event.key === "Escape") {
         event.preventDefault();
         closeSlashMenu();
@@ -143,6 +136,25 @@
     }
   }
 
+  function onTextareaKeyup(event: KeyboardEvent) {
+    // Cursor-move keys can change the slash window even though `oninput`
+    // didn't fire. Re-evaluate on those.
+    if (
+      event.key === "ArrowLeft" ||
+      event.key === "ArrowRight" ||
+      event.key === "ArrowUp" ||
+      event.key === "ArrowDown" ||
+      event.key === "Home" ||
+      event.key === "End"
+    ) {
+      refreshSlashState();
+    }
+  }
+
+  function onTextareaClick() {
+    refreshSlashState();
+  }
+
   function applySuggestion(s: SlashSuggestion) {
     const action = s.resolve();
     if (action.kind === "openDatePicker") {
@@ -167,15 +179,15 @@
     const before = textareaEl.value.slice(0, slashStart);
     const after = textareaEl.value.slice(textareaEl.selectionStart);
     const next = before + after;
-    textareaEl.value = next;
     content = next;
-    textareaEl.setSelectionRange(slashStart, slashStart);
-    autoResize(textareaEl);
+    // The DOM update happens reactively; immediately reset selection on the new value.
+    queueMicrotask(() => {
+      if (!textareaEl) return;
+      textareaEl.value = next;
+      textareaEl.setSelectionRange(slashStart!, slashStart!);
+      autoResize(textareaEl);
+    });
     save.flush();
-  }
-
-  function onTextareaSelect() {
-    updateSlashState();
   }
 
   async function onDelete() {
@@ -192,18 +204,19 @@
     onTogglePin?.(entry);
   }
 
-  // Re-run autoResize when entry prop content changes externally.
+  // Auto-size when the content state updates (covers external prop changes
+  // and programmatic edits like slash removal).
   $effect(() => {
-    if (textareaEl) autoResize(textareaEl);
+    void content;
+    autoResize(textareaEl);
   });
 
   const toolbarVisible = $derived(focused || hovered);
 </script>
 
 <article
-  bind:this={containerEl}
   id={`entry-${entry.date}`}
-  class="relative scroll-mt-24 py-4"
+  class="group relative scroll-mt-24 py-4"
   onmouseenter={() => (hovered = true)}
   onmouseleave={() => (hovered = false)}
   role="region"
@@ -222,62 +235,58 @@
     bind:this={textareaEl}
     rows="1"
     class="w-full resize-none border-none bg-transparent p-0 text-base leading-relaxed focus:outline-none focus:ring-0"
-    value={content}
+    bind:value={content}
     oninput={onContentInput}
     onkeydown={onTextareaKeydown}
-    onselectionchange={onTextareaSelect}
+    onkeyup={onTextareaKeyup}
+    onclick={onTextareaClick}
     onfocus={() => (focused = true)}
     onblur={() => {
       focused = false;
-      // Close menu only if focus is leaving the textarea entirely.
-      // The popup catches its own clicks before blur fires.
+      // Allow popup mousedown to fire before we close.
       setTimeout(() => {
         if (!textareaEl || document.activeElement !== textareaEl) {
           closeSlashMenu();
         }
-      }, 0);
+      }, 100);
     }}
     autocomplete="off"
     spellcheck="true"
   ></textarea>
 
-  {#if toolbarVisible}
-    <div
-      class="absolute right-0 top-3 flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-1.5 py-1 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-900"
+  <div
+    class="absolute right-0 top-3 flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-1.5 py-1 text-xs shadow-sm transition-opacity dark:border-slate-700 dark:bg-slate-900"
+    class:opacity-0={!toolbarVisible}
+    class:pointer-events-none={!toolbarVisible}
+  >
+    {#if saveStatus === "saving"}
+      <span class="px-1 text-slate-500">Saving…</span>
+    {:else if saveStatus === "saved"}
+      <span class="px-1 text-emerald-600">Saved</span>
+    {:else if saveStatus === "error"}
+      <span class="px-1 text-rose-600">Save failed</span>
+    {/if}
+    <button
+      type="button"
+      tabindex={-1}
+      onclick={onPinClick}
+      class="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-amber-500 dark:hover:bg-slate-800"
+      class:text-amber-500={entry.isPinned}
+      title={entry.isPinned ? "Unpin" : "Pin to top"}
+      aria-pressed={entry.isPinned}
     >
-      {#if saveStatus === "saving"}
-        <span class="px-1 text-slate-500">Saving…</span>
-      {:else if saveStatus === "saved"}
-        <span class="px-1 text-emerald-600">Saved</span>
-      {:else if saveStatus === "error"}
-        <span class="px-1 text-rose-600">Save failed</span>
-      {/if}
-      <button
-        type="button"
-        onmousedown={(e) => {
-          e.preventDefault();
-          onPinClick();
-        }}
-        class="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-amber-500 dark:hover:bg-slate-800"
-        class:text-amber-500={entry.isPinned}
-        title={entry.isPinned ? "Unpin" : "Pin to top"}
-        aria-pressed={entry.isPinned}
-      >
-        📌
-      </button>
-      <button
-        type="button"
-        onmousedown={(e) => {
-          e.preventDefault();
-          void onDelete();
-        }}
-        class="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-rose-600 dark:hover:bg-slate-800"
-        title="Delete"
-      >
-        🗑
-      </button>
-    </div>
-  {/if}
+      📌
+    </button>
+    <button
+      type="button"
+      tabindex={-1}
+      onclick={() => void onDelete()}
+      class="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-rose-600 dark:hover:bg-slate-800"
+      title="Delete"
+    >
+      🗑
+    </button>
+  </div>
 
   {#if errorMessage}
     <p class="mt-2 text-xs text-rose-600">{errorMessage}</p>
