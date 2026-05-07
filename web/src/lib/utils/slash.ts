@@ -54,33 +54,31 @@ export const SLASH_COMMANDS: SlashCommand[] = [
  * Returns the slash trigger info if the cursor is currently inside a
  * slash command (e.g. `/tod` with cursor right after the d).
  *
- * - The `/` must be at the start of the textarea, after whitespace, or
- *   at the start of a line — otherwise we treat the slash as literal text.
- * - The query may not contain whitespace.
+ * Notion-style: any `/` opens the menu regardless of surrounding text.
+ * The "query" is everything from the `/` up to the cursor, stopping at
+ * whitespace so the menu hides as soon as the user types a space.
+ *
+ * Limit scan length so a one-off slash deep in a long paragraph
+ * doesn't keep matching forever.
  */
 export interface SlashTrigger {
   slashIndex: number;
   query: string;
 }
 
+const MAX_SCAN = 40;
+
 export function detectSlashTrigger(
   text: string,
   cursor: number,
 ): SlashTrigger | null {
-  let i = cursor - 1;
-  while (i >= 0) {
+  const start = Math.max(0, cursor - MAX_SCAN);
+  for (let i = cursor - 1; i >= start; i--) {
     const ch = text[i];
     if (ch === "/") {
-      // Allow only if the character before is start-of-text, whitespace, or
-      // newline.
-      const prev = i === 0 ? "" : text[i - 1];
-      if (i === 0 || prev === " " || prev === "\n" || prev === "\t") {
-        return { slashIndex: i, query: text.slice(i + 1, cursor) };
-      }
-      return null;
+      return { slashIndex: i, query: text.slice(i + 1, cursor) };
     }
     if (ch === " " || ch === "\n" || ch === "\t") return null;
-    i--;
   }
   return null;
 }
