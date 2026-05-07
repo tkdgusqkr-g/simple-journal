@@ -73,9 +73,14 @@
     if (!textareaEl) return;
     const trig = detectSlashTrigger(textareaEl.value, textareaEl.selectionStart);
     if (trig) {
+      // Only reset the highlighted suggestion when the slash position or the
+      // query actually changes — otherwise arrow-key navigation in the menu
+      // would snap back to the first item every time keyup fires.
+      const isFreshTrigger =
+        slashStart !== trig.slashIndex || slashQuery !== trig.query;
       slashStart = trig.slashIndex;
       slashQuery = trig.query;
-      slashSelectedIdx = 0;
+      if (isFreshTrigger) slashSelectedIdx = 0;
       slashPos = computeMenuPosition(textareaEl);
     } else {
       closeSlashMenu();
@@ -137,8 +142,12 @@
   }
 
   function onTextareaKeyup(event: KeyboardEvent) {
-    // Cursor-move keys can change the slash window even though `oninput`
-    // didn't fire. Re-evaluate on those.
+    // While the menu is open the keydown handler owns navigation; don't
+    // recompute here or we'd fight it (and the textarea cursor isn't
+    // moving anyway because keydown calls preventDefault).
+    if (slashOpen) return;
+    // Outside the menu, cursor-move keys can land inside or leave a slash
+    // context, so re-evaluate.
     if (
       event.key === "ArrowLeft" ||
       event.key === "ArrowRight" ||
