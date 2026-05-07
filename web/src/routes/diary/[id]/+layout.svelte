@@ -64,13 +64,12 @@
             role="tab"
             aria-selected={onCalendarPage}
             onclick={goToCalendar}
-            class="rounded-lg px-3 py-1.5 text-sm font-medium transition"
-            class:bg-blue-600={onCalendarPage}
-            class:text-white={onCalendarPage}
-            class:text-slate-600={!onCalendarPage}
-            class:dark:text-slate-300={!onCalendarPage}
-            class:hover:bg-slate-100={!onCalendarPage}
-            class:dark:hover:bg-slate-800={!onCalendarPage}
+            class={
+              "rounded-lg px-3 py-1.5 text-sm font-medium transition " +
+              (onCalendarPage
+                ? "bg-blue-600 text-white"
+                : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800")
+            }
           >
             <span aria-hidden="true" class="mr-1">📅</span>
             Calendar
@@ -80,13 +79,12 @@
             role="tab"
             aria-selected={onNotesPage}
             onclick={goToNotes}
-            class="rounded-lg px-3 py-1.5 text-sm font-medium transition"
-            class:bg-blue-600={onNotesPage}
-            class:text-white={onNotesPage}
-            class:text-slate-600={!onNotesPage}
-            class:dark:text-slate-300={!onNotesPage}
-            class:hover:bg-slate-100={!onNotesPage}
-            class:dark:hover:bg-slate-800={!onNotesPage}
+            class={
+              "rounded-lg px-3 py-1.5 text-sm font-medium transition " +
+              (onNotesPage
+                ? "bg-blue-600 text-white"
+                : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800")
+            }
           >
             <span aria-hidden="true" class="mr-1">✏️</span>
             Notes

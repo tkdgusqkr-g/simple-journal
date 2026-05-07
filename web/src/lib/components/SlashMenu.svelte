@@ -49,9 +49,10 @@
         <li>
           <button
             type="button"
-            class="flex w-full items-center justify-between px-3 py-2 text-left text-sm transition"
-            class:bg-blue-50={i === selectedIndex}
-            class:dark:bg-blue-950={i === selectedIndex}
+            class={
+              "flex w-full items-center justify-between px-3 py-2 text-left text-sm transition " +
+              (i === selectedIndex ? "bg-blue-50 dark:bg-blue-950" : "")
+            }
             onmousedown={(e) => {
               e.preventDefault();
               onSelectSuggestion(s);

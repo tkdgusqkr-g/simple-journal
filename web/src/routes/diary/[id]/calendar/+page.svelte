@@ -145,9 +145,10 @@
       >
         <div class="flex items-baseline justify-between">
           <span
-            class="text-sm font-semibold"
-            class:text-blue-600={isToday}
-            class:dark:text-blue-400={isToday}
+            class={
+              "text-sm font-semibold " +
+              (isToday ? "text-blue-600 dark:text-blue-400" : "")
+            }
           >
             {cell.date.getDate()}
           </span>

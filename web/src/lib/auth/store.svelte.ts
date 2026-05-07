@@ -68,13 +68,14 @@ function createAuthStore() {
 
         // If we already have a verified user for this firebase uid, just
         // refresh the bearer token and skip the verify roundtrip + the
-        // state.user reassignment.
+        // state.* reassignments. Nothing in the app reads firebaseUser
+        // reactively, so we don't bump it either — that bump on every
+        // token refresh was the second-most-suspect cascade source.
         if (
           state.status === "authenticated" &&
           state.user &&
           state.firebaseUser?.uid === fbUser.uid
         ) {
-          if (state.firebaseUser !== fbUser) state.firebaseUser = fbUser;
           return;
         }
 
