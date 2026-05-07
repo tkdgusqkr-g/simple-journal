@@ -111,7 +111,31 @@
     refreshSlashState();
   }
 
+  async function deleteSilently() {
+    try {
+      await entriesApi.remove(entry.id);
+      onDeleted?.(entry.id);
+    } catch (err) {
+      errorMessage = err instanceof Error ? err.message : "delete failed";
+    }
+  }
+
   function onTextareaKeydown(event: KeyboardEvent) {
+    // Backspace at the very start of an empty entry removes the entry —
+    // the natural way to undo a slash command (`/today`) you regret.
+    if (
+      !slashOpen &&
+      event.key === "Backspace" &&
+      textareaEl !== null &&
+      textareaEl.selectionStart === 0 &&
+      textareaEl.selectionEnd === 0 &&
+      content.length === 0
+    ) {
+      event.preventDefault();
+      void deleteSilently();
+      return;
+    }
+
     if (!slashOpen) return;
     if (slashShowDatePicker) {
       if (event.key === "Escape") {
