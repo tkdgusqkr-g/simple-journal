@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { entriesApi } from "$lib/api/diaries";
   import { debounce } from "$lib/utils/debounce";
   import { formatLongDate } from "$lib/utils/date";
@@ -213,10 +214,10 @@
     onTogglePin?.(entry);
   }
 
-  // Auto-size when the content state updates (covers external prop changes
-  // and programmatic edits like slash removal).
-  $effect(() => {
-    void content;
+  // Initial size after the textarea is in the DOM. Subsequent resizing is
+  // driven from input handlers and the slash-removal microtask, not from
+  // an $effect, so we don't risk an effect/state update loop.
+  onMount(() => {
     autoResize(textareaEl);
   });
 
