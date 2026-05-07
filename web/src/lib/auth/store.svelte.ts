@@ -49,20 +49,40 @@ function createAuthStore() {
     const auth = getFirebaseAuth();
 
     auth.onIdTokenChanged(async (fbUser) => {
-      state.firebaseUser = fbUser;
+      // Firebase fires this on every token refresh (~hourly) — avoid
+      // re-poking reactive state when nothing actually changed, which
+      // can cascade into runaway $effect re-runs in pages that depend
+      // on authStore.status.
       if (!fbUser) {
-        state.status = "anonymous";
-        state.user = null;
+        if (state.status !== "anonymous") {
+          state.firebaseUser = null;
+          state.status = "anonymous";
+          state.user = null;
+        }
         apiClient.setIdToken(null);
         return;
       }
       try {
         const idToken = await fbUser.getIdToken();
         apiClient.setIdToken(idToken);
+
+        // If we already have a verified user for this firebase uid, just
+        // refresh the bearer token and skip the verify roundtrip + the
+        // state.user reassignment.
+        if (
+          state.status === "authenticated" &&
+          state.user &&
+          state.firebaseUser?.uid === fbUser.uid
+        ) {
+          if (state.firebaseUser !== fbUser) state.firebaseUser = fbUser;
+          return;
+        }
+
         const result = await apiClient.post<{ user: User }>(
           "/api/auth/verify",
           { idToken },
         );
+        state.firebaseUser = fbUser;
         state.user = result.user;
         state.status = "authenticated";
         state.error = null;
@@ -70,6 +90,7 @@ function createAuthStore() {
         state.error = err instanceof Error ? err.message : "auth failed";
         state.status = "anonymous";
         state.user = null;
+        state.firebaseUser = null;
         apiClient.setIdToken(null);
       }
     });
