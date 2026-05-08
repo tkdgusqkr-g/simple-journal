@@ -283,13 +283,22 @@
   }
 
   onMount(() => {
-    autoResize(textareaEl);
+    // Set the initial value imperatively rather than via `bind:value` /
+    // `value={...}` — those re-write the DOM on every state change,
+    // which clears the browser's native undo stack on every keystroke.
+    if (textareaEl) {
+      textareaEl.value = entry.content;
+      autoResize(textareaEl);
+    }
   });
 
   // When the parent rewrites our entry.content prop (e.g. another entry
   // got merged into us via Backspace), pull the new content into our
-  // local state — but only when this textarea isn't focused, so we
-  // never clobber what the user is currently typing.
+  // local state and DOM — but only when this textarea isn't focused,
+  // so we never clobber what the user is currently typing. This is
+  // the only path that programmatically writes to textareaEl.value
+  // outside of a user gesture, so undo is lost only here (acceptable
+  // for the merge case, which is itself a destructive change).
   $effect(() => {
     const incoming = entry.content;
     untrack(() => {
@@ -297,8 +306,10 @@
         textareaEl !== null && document.activeElement === textareaEl;
       if (!isFocused && incoming !== content && !deleted) {
         content = incoming;
-        // After Svelte updates the DOM via bind:value, fix the height.
-        queueMicrotask(() => autoResize(textareaEl));
+        if (textareaEl) {
+          textareaEl.value = incoming;
+          autoResize(textareaEl);
+        }
       }
     });
   });
@@ -318,7 +329,6 @@
     bind:this={textareaEl}
     rows="1"
     class="w-full resize-none border-none bg-transparent p-0 text-base leading-relaxed focus:outline-none focus:ring-0"
-    bind:value={content}
     oninput={onContentInput}
     onkeydown={onTextareaKeydown}
     onkeyup={onTextareaKeyup}
