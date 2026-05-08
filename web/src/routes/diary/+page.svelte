@@ -45,6 +45,19 @@
       createError = err instanceof Error ? err.message : "failed to create";
     }
   }
+
+  async function onDelete(d: Diary) {
+    const ok = confirm(
+      `Delete "${d.name}"? All of its writing will be permanently removed.`,
+    );
+    if (!ok) return;
+    try {
+      await diariesApi.remove(d.id);
+      diaries = diaries.filter((x) => x.id !== d.id);
+    } catch (err) {
+      error = err instanceof Error ? err.message : "failed to delete diary";
+    }
+  }
 </script>
 
 <svelte:head>
@@ -117,13 +130,13 @@
   {:else}
     <ul class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {#each diaries as diary (diary.id)}
-        <li>
+        <li class="group relative">
           <a
             href={`/diary/${diary.id}`}
             class="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-blue-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-blue-700"
           >
-            <div class="flex items-center justify-between">
-              <h2 class="font-semibold tracking-tight">{diary.name}</h2>
+            <div class="flex items-center justify-between gap-2">
+              <h2 class="truncate font-semibold tracking-tight">{diary.name}</h2>
               <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800">
                 {diary.type}
               </span>
@@ -132,6 +145,15 @@
               Created {new Date(diary.createdAt).toLocaleDateString()}
             </p>
           </a>
+          <button
+            type="button"
+            onclick={() => void onDelete(diary)}
+            aria-label={`Delete ${diary.name}`}
+            title="Delete diary"
+            class="absolute bottom-3 right-3 rounded-md p-1.5 text-slate-400 opacity-0 transition hover:bg-rose-50 hover:text-rose-600 focus-visible:opacity-100 group-hover:opacity-100 dark:hover:bg-rose-950"
+          >
+            🗑
+          </button>
         </li>
       {/each}
     </ul>
