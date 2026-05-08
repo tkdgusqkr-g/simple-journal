@@ -409,6 +409,7 @@
     top={slashPos.top}
     left={slashPos.left}
     onSelectSuggestion={applySuggestion}
+    onHoverSuggestion={(i) => (slashSelectedIdx = i)}
     onPickDate={onPickDate}
     onClose={closeSlashMenu}
   />

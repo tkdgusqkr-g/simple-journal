@@ -9,6 +9,7 @@
     top: number;
     left: number;
     onSelectSuggestion: (s: SlashSuggestion) => void;
+    onHoverSuggestion: (index: number) => void;
     onPickDate: (iso: string) => void;
     onClose: () => void;
   }
@@ -20,6 +21,7 @@
     top,
     left,
     onSelectSuggestion,
+    onHoverSuggestion,
     onPickDate,
     onClose,
   }: Props = $props();
@@ -60,6 +62,7 @@
               (i === selectedIndex ? "bg-blue-50 dark:bg-blue-950" : "")
             }
             onmousedown={(e) => e.preventDefault()}
+            onmouseenter={() => onHoverSuggestion(i)}
             onclick={() => onSelectSuggestion(s)}
             role="option"
             aria-selected={i === selectedIndex}
