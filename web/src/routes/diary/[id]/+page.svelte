@@ -368,7 +368,7 @@
   <title>{`Diary · SimpleJournal`}</title>
 </svelte:head>
 
-<main class="mx-auto min-h-screen max-w-3xl px-4 py-6 sm:px-6">
+<main class="mx-auto max-w-3xl px-4 py-6 sm:px-6">
   {#if loading}
     <p class="text-sm text-slate-500">
       {migrating ? "Reorganizing your old entries…" : "Loading…"}
@@ -380,7 +380,7 @@
   {:else}
     <textarea
       bind:this={textareaEl}
-      class="min-h-[60vh] w-full resize-none border-none bg-transparent p-0 text-base leading-relaxed focus:outline-none focus:ring-0"
+      class="min-h-[200px] w-full resize-none border-none bg-transparent p-0 pb-[70vh] text-base leading-relaxed focus:outline-none focus:ring-0"
       placeholder=""
       oninput={onContentInput}
       onkeydown={onTextareaKeydown}
