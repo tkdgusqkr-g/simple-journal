@@ -4,13 +4,13 @@ import type {
   DiaryRole,
   DiaryType,
 } from "@simple-journal/shared-types/domain";
-import type { Database } from "../ports/Database.js";
+import type { Database, InviteLink } from "../ports/Database.js";
 import {
   ForbiddenError,
   NotFoundError,
   ValidationError,
 } from "./errors.js";
-import { newDiaryId } from "./ids.js";
+import { newDiaryId, newInviteToken, nowIso } from "./ids.js";
 
 export class DiaryService {
   constructor(private readonly db: Database) {}
@@ -91,6 +91,48 @@ export class DiaryService {
       await this.requireRole(input.diaryId, input.actingUserId, ["owner"]);
     }
     await this.db.removeMember(input.diaryId, input.targetUserId);
+  }
+
+  // ─── Invite Links ──────────────────────────────────────────────────
+
+  async createInviteLink(input: {
+    diaryId: string;
+    userId: string;
+    role: "editor" | "viewer";
+    expiresInDays?: number;
+  }): Promise<InviteLink> {
+    await this.requireRole(input.diaryId, input.userId, ["owner"]);
+    const expiresAt = input.expiresInDays
+      ? new Date(Date.now() + input.expiresInDays * 86400000).toISOString()
+      : null;
+    return this.db.createInviteLink({
+      token: newInviteToken(),
+      diaryId: input.diaryId,
+      role: input.role,
+      createdBy: input.userId,
+      expiresAt,
+    });
+  }
+
+  async acceptInviteLink(token: string, userId: string): Promise<void> {
+    const link = await this.db.getInviteLink(token);
+    if (!link) throw new NotFoundError("invite link", token);
+    if (link.expiresAt && new Date(link.expiresAt) < new Date()) {
+      throw new ValidationError("invite link has expired");
+    }
+    await this.db.addMember(link.diaryId, userId, link.role);
+  }
+
+  async listInviteLinks(diaryId: string, userId: string): Promise<InviteLink[]> {
+    await this.requireRole(diaryId, userId, ["owner"]);
+    return this.db.listInviteLinks(diaryId);
+  }
+
+  async deleteInviteLink(token: string, userId: string): Promise<void> {
+    const link = await this.db.getInviteLink(token);
+    if (!link) throw new NotFoundError("invite link", token);
+    await this.requireRole(link.diaryId, userId, ["owner"]);
+    await this.db.deleteInviteLink(token);
   }
 
   /**

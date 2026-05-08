@@ -18,6 +18,7 @@ import { diaryEntryRoutes, entryRoutes } from "./api/routes/entries.js";
 import { memberRoutes } from "./api/routes/members.js";
 import { pinRoutes } from "./api/routes/pins.js";
 import { searchRoutes } from "./api/routes/search.js";
+import { inviteRoutes } from "./api/routes/invites.js";
 import { errorHandler } from "./api/middleware/error.js";
 import { requireAuth } from "./api/middleware/auth.js";
 import { requestLogger } from "./api/middleware/logging.js";
@@ -88,6 +89,8 @@ app.use("/api/*", async (c, next) => {
 app.route("/api/diaries", diaryRoutes);
 app.route("/api/diaries", diaryEntryRoutes);
 app.route("/api/diaries", memberRoutes);
+app.route("/api/diaries", inviteRoutes);
+app.route("/api/invite", inviteRoutes);
 app.route("/api/entries", entryRoutes);
 app.route("/api/entries", pinRoutes);
 app.route("/api/search", searchRoutes);

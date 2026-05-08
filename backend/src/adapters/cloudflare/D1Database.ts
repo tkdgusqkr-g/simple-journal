@@ -12,8 +12,10 @@ import { drizzle } from "drizzle-orm/d1";
 import type {
   CreateDiaryInput,
   CreateEntryInput,
+  CreateInviteLinkInput,
   CreateUserInput,
   Database,
+  InviteLink,
   ListEntriesOptions,
   ListEntriesResult,
   PinUpdate,
@@ -424,5 +426,45 @@ export class D1DatabaseAdapter implements Database {
         .insert(schema.entryTags)
         .values(tags.map((tag) => ({ entryId, tag })));
     }
+  }
+
+  // ─── Invite Links ──────────────────────────────────────────────────
+
+  async createInviteLink(input: CreateInviteLinkInput): Promise<InviteLink> {
+    const [row] = await this.db
+      .insert(schema.inviteLinks)
+      .values({
+        token: input.token,
+        diaryId: input.diaryId,
+        role: input.role,
+        createdBy: input.createdBy,
+        expiresAt: input.expiresAt,
+      })
+      .returning();
+    if (!row) throw new Error("createInviteLink: insert returned no rows");
+    return row as InviteLink;
+  }
+
+  async getInviteLink(token: string): Promise<InviteLink | null> {
+    const rows = await this.db
+      .select()
+      .from(schema.inviteLinks)
+      .where(eq(schema.inviteLinks.token, token))
+      .limit(1);
+    return (rows[0] as InviteLink) ?? null;
+  }
+
+  async listInviteLinks(diaryId: string): Promise<InviteLink[]> {
+    const rows = await this.db
+      .select()
+      .from(schema.inviteLinks)
+      .where(eq(schema.inviteLinks.diaryId, diaryId));
+    return rows as InviteLink[];
+  }
+
+  async deleteInviteLink(token: string): Promise<void> {
+    await this.db
+      .delete(schema.inviteLinks)
+      .where(eq(schema.inviteLinks.token, token));
   }
 }

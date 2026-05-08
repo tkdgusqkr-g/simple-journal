@@ -66,6 +66,23 @@ export interface PinUpdate {
   pinnedBy: string | null;
 }
 
+export interface InviteLink {
+  token: string;
+  diaryId: string;
+  role: "editor" | "viewer";
+  createdBy: string;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
+export interface CreateInviteLinkInput {
+  token: string;
+  diaryId: string;
+  role: "editor" | "viewer";
+  createdBy: string;
+  expiresAt: string | null;
+}
+
 /**
  * Storage port. Backed by Drizzle + D1 in production. Tests can swap with
  * an in-memory fake.
@@ -103,4 +120,10 @@ export interface Database {
   deleteEntry(id: string): Promise<void>;
   setEntryPin(id: string, update: PinUpdate): Promise<Entry>;
   searchEntries(opts: SearchEntriesOptions): Promise<Entry[]>;
+
+  // Invite links
+  createInviteLink(input: CreateInviteLinkInput): Promise<InviteLink>;
+  getInviteLink(token: string): Promise<InviteLink | null>;
+  listInviteLinks(diaryId: string): Promise<InviteLink[]>;
+  deleteInviteLink(token: string): Promise<void>;
 }

@@ -2,6 +2,7 @@
   import { authStore } from "$lib/auth/store.svelte";
   import { diariesApi } from "$lib/api/diaries";
   import { clearDiaryCache } from "$lib/utils/cache";
+  import MembersModal from "$lib/components/MembersModal.svelte";
   import type { Diary, DiaryType } from "@simple-journal/shared-types/domain";
 
   let diaries = $state<Diary[]>([]);
@@ -12,6 +13,7 @@
   let newName = $state("");
   let newType = $state<DiaryType>("personal");
   let createError = $state<string | null>(null);
+  let membersModalDiaryId = $state<string | null>(null);
 
   async function load() {
     if (authStore.status !== "authenticated") return;
@@ -170,8 +172,23 @@
           >
             🗑
           </button>
+          {#if diary.type === "shared"}
+            <button
+              type="button"
+              onclick={() => (membersModalDiaryId = diary.id)}
+              aria-label={`Manage members of ${diary.name}`}
+              title="Manage members"
+              class="absolute bottom-3 right-10 rounded-md p-1.5 text-slate-400 opacity-0 transition hover:bg-blue-50 hover:text-blue-600 focus-visible:opacity-100 group-hover:opacity-100 dark:hover:bg-blue-950"
+            >
+              👥
+            </button>
+          {/if}
         </li>
       {/each}
     </ul>
   {/if}
 </main>
+
+{#if membersModalDiaryId}
+  <MembersModal diaryId={membersModalDiaryId} onClose={() => (membersModalDiaryId = null)} />
+{/if}

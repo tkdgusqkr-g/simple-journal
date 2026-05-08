@@ -45,6 +45,29 @@ export const diariesApi = {
     apiClient.delete<{ removed: boolean }>(
       `/api/diaries/${id}/members/${userId}`,
     ),
+
+  createInviteLink: (id: string, role: "editor" | "viewer", expiresInDays?: number) =>
+    apiClient
+      .post<{ link: { token: string; role: string; expiresAt: string | null } }>(
+        `/api/diaries/${id}/invite-links`,
+        { role, expiresInDays },
+      )
+      .then((r) => r.link),
+
+  listInviteLinks: (id: string) =>
+    apiClient
+      .get<{ links: { token: string; role: string; expiresAt: string | null; createdAt: string }[] }>(
+        `/api/diaries/${id}/invite-links`,
+      )
+      .then((r) => r.links),
+
+  deleteInviteLink: (diaryId: string, token: string) =>
+    apiClient.delete<{ deleted: boolean }>(
+      `/api/diaries/${diaryId}/invite-links/${token}`,
+    ),
+
+  acceptInviteLink: (token: string) =>
+    apiClient.post<{ joined: boolean }>(`/api/invite/accept/${token}`, {}),
 };
 
 export const entriesApi = {

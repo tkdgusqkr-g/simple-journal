@@ -168,3 +168,24 @@ export const entryTags = sqliteTable(
     tagIdx: index("entry_tags_tag_idx").on(t.tag),
   }),
 );
+
+export const inviteLinks = sqliteTable(
+  "invite_links",
+  {
+    token: text("token").primaryKey(),
+    diaryId: text("diary_id")
+      .notNull()
+      .references(() => diaries.id, { onDelete: "cascade" }),
+    role: text("role", { enum: ["editor", "viewer"] }).notNull(),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expiresAt: text("expires_at"),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(CURRENT_TIMESTAMP)`),
+  },
+  (t) => ({
+    diaryIdx: index("invite_links_diary_idx").on(t.diaryId),
+  }),
+);

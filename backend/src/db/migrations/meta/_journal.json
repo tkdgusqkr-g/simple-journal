@@ -8,6 +8,13 @@
       "when": 1778084772806,
       "tag": "0000_simple_post",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1778200000000,
+      "tag": "0001_invite_links",
+      "breakpoints": true
     }
   ]
 }
