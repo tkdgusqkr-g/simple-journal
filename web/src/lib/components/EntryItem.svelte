@@ -78,6 +78,17 @@
     el.style.height = `${Math.max(el.scrollHeight, 28)}px`;
   }
 
+  function isOnFirstLine(ta: HTMLTextAreaElement): boolean {
+    const cursor = ta.selectionStart;
+    if (cursor === 0) return true;
+    return ta.value.lastIndexOf("\n", cursor - 1) === -1;
+  }
+
+  function isOnLastLine(ta: HTMLTextAreaElement): boolean {
+    const cursor = ta.selectionStart;
+    return ta.value.indexOf("\n", cursor) === -1;
+  }
+
   function refreshSlashState() {
     if (!textareaEl) return;
     const trig = detectSlashTrigger(textareaEl.value, textareaEl.selectionStart);
@@ -173,6 +184,16 @@
         return;
       }
       if (event.key === "ArrowRight" && atEnd) {
+        event.preventDefault();
+        onFocusNext?.();
+        return;
+      }
+      if (event.key === "ArrowUp" && isOnFirstLine(textareaEl)) {
+        event.preventDefault();
+        onFocusPrev?.();
+        return;
+      }
+      if (event.key === "ArrowDown" && isOnLastLine(textareaEl)) {
         event.preventDefault();
         onFocusNext?.();
         return;
