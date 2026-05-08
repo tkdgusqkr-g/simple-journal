@@ -29,7 +29,7 @@
   });
 </script>
 
-<div class="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+<div class="sticky top-0 z-40 border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
   <div class="mx-auto max-w-3xl px-4 py-4 sm:px-6">
     <a href="/diary" class="text-xs text-slate-500 hover:underline">← All diaries</a>
     <div class="mt-1 min-w-0">
