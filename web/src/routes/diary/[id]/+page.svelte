@@ -380,7 +380,7 @@
   {:else}
     <textarea
       bind:this={textareaEl}
-      class="min-h-[200px] w-full resize-none border-none bg-transparent p-0 pb-[70vh] text-base leading-relaxed focus:outline-none focus:ring-0"
+      class="min-h-[200px] w-full resize-none border-none bg-transparent p-0 pb-[100vh] text-base leading-relaxed focus:outline-none focus:ring-0"
       placeholder=""
       oninput={onContentInput}
       onkeydown={onTextareaKeydown}
