@@ -1,0 +1,331 @@
+<script lang="ts">
+  import { onMount } from "svelte";
+  import { page } from "$app/state";
+  import { ApiError } from "$lib/api/client";
+  import { authStore } from "$lib/auth/store.svelte";
+  import { entriesApi } from "$lib/api/diaries";
+  import { todayIso } from "$lib/utils/date";
+  import { debounce } from "$lib/utils/debounce";
+  import {
+    detectSlashTrigger,
+    suggestionsFor,
+    type SlashAction,
+    type SlashSuggestion,
+  } from "$lib/utils/slash";
+  import SlashMenu from "$lib/components/SlashMenu.svelte";
+  import type { Entry } from "@simple-journal/shared-types/domain";
+
+  const diaryId = $derived(page.params.id as string);
+
+  let entry = $state<Entry | null>(null);
+  let content = $state("");
+  let textareaEl = $state<HTMLTextAreaElement | null>(null);
+  let loading = $state(true);
+  let migrating = $state(false);
+  let error = $state<string | null>(null);
+
+  // Slash menu state
+  let slashStart = $state<number | null>(null);
+  let slashQuery = $state("");
+  let slashSelectedIdx = $state(0);
+  let slashShowDatePicker = $state(false);
+  let slashPos = $state({ top: 0, left: 0 });
+
+  const slashSuggestions = $derived(
+    slashStart !== null ? suggestionsFor(slashQuery) : [],
+  );
+  const slashOpen = $derived(
+    slashStart !== null && (slashShowDatePicker || slashSuggestions.length > 0),
+  );
+
+  const save = debounce(async () => {
+    if (!entry) return;
+    try {
+      const updated = await entriesApi.update(entry.id, { content });
+      entry = updated;
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) return;
+      console.warn("[diary save] failed:", err);
+    }
+  }, 800);
+
+  function autoResize() {
+    if (!textareaEl) return;
+    textareaEl.style.height = "auto";
+    textareaEl.style.height = `${Math.max(textareaEl.scrollHeight, 200)}px`;
+  }
+
+  /**
+   * Load (and if necessary, migrate) the diary's single backing entry.
+   *
+   * The new model stores each diary as one big text document. For an
+   * existing diary that still has multiple per-date entries from the
+   * old model, we concatenate them chronologically (with ISO date
+   * markers) into the oldest entry, then delete the rest. This runs
+   * once per diary.
+   */
+  async function loadOrMigrate() {
+    if (!diaryId) return;
+    loading = true;
+    error = null;
+    try {
+      const all: Entry[] = [];
+      let cursor: string | null = null;
+      do {
+        const res = await entriesApi.listInDiary(diaryId, {
+          cursor: cursor ?? undefined,
+          limit: 100,
+        });
+        all.push(...res.entries);
+        cursor = res.nextCursor;
+      } while (cursor);
+
+      if (all.length === 0) {
+        const created = await entriesApi.upsert(diaryId, {
+          date: todayIso(),
+          content: "",
+          tags: [],
+        });
+        entry = created;
+        content = "";
+      } else if (all.length === 1) {
+        entry = all[0]!;
+        content = entry.content;
+      } else {
+        migrating = true;
+        const sorted = all.slice().sort((a, b) => a.date.localeCompare(b.date));
+        const main = sorted[0]!;
+        const others = sorted.slice(1);
+        const merged = sorted
+          .map((e) => {
+            const trimmed = e.content.trim();
+            return trimmed.length > 0 ? `${e.date}\n${trimmed}` : null;
+          })
+          .filter((s): s is string => s !== null)
+          .join("\n\n");
+
+        const updated = await entriesApi.update(main.id, { content: merged });
+        await Promise.all(
+          others.map((e) =>
+            entriesApi.remove(e.id).catch(() => {
+              // best-effort — leftover stale entries are harmless
+            }),
+          ),
+        );
+        entry = updated;
+        content = merged;
+        migrating = false;
+      }
+
+      if (textareaEl) {
+        textareaEl.value = content;
+        autoResize();
+      }
+    } catch (err) {
+      error = err instanceof Error ? err.message : "failed to load diary";
+    } finally {
+      loading = false;
+    }
+  }
+
+  let triggered = false;
+  $effect(() => {
+    if (triggered) return;
+    if (authStore.status === "authenticated" && diaryId) {
+      triggered = true;
+      void loadOrMigrate();
+    }
+  });
+
+  function refreshSlashState() {
+    if (!textareaEl) return;
+    const trig = detectSlashTrigger(textareaEl.value, textareaEl.selectionStart);
+    if (trig) {
+      const isFresh =
+        slashStart !== trig.slashIndex || slashQuery !== trig.query;
+      slashStart = trig.slashIndex;
+      slashQuery = trig.query;
+      if (isFresh) slashSelectedIdx = 0;
+      slashPos = computeMenuPos(textareaEl);
+    } else {
+      closeSlashMenu();
+    }
+  }
+
+  function closeSlashMenu() {
+    slashStart = null;
+    slashQuery = "";
+    slashShowDatePicker = false;
+    slashSelectedIdx = 0;
+  }
+
+  function computeMenuPos(ta: HTMLTextAreaElement): {
+    top: number;
+    left: number;
+  } {
+    const rect = ta.getBoundingClientRect();
+    return { top: rect.bottom + 4, left: rect.left + 8 };
+  }
+
+  function onContentInput() {
+    if (!textareaEl) return;
+    content = textareaEl.value;
+    autoResize();
+    save();
+    refreshSlashState();
+  }
+
+  function onTextareaKeydown(event: KeyboardEvent) {
+    if (!slashOpen) return;
+    if (slashShowDatePicker) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeSlashMenu();
+      }
+      return;
+    }
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      slashSelectedIdx = Math.min(
+        slashSuggestions.length - 1,
+        slashSelectedIdx + 1,
+      );
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      slashSelectedIdx = Math.max(0, slashSelectedIdx - 1);
+    } else if (event.key === "Enter" || event.key === "Tab") {
+      const choice = slashSuggestions[slashSelectedIdx];
+      if (choice) {
+        event.preventDefault();
+        applySuggestion(choice);
+      }
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      closeSlashMenu();
+    }
+  }
+
+  function onTextareaKeyup(event: KeyboardEvent) {
+    if (slashOpen) return;
+    if (
+      event.key === "ArrowLeft" ||
+      event.key === "ArrowRight" ||
+      event.key === "ArrowUp" ||
+      event.key === "ArrowDown" ||
+      event.key === "Home" ||
+      event.key === "End"
+    ) {
+      refreshSlashState();
+    }
+  }
+
+  function onTextareaClick() {
+    refreshSlashState();
+  }
+
+  function applySuggestion(s: SlashSuggestion) {
+    const action = s.resolve();
+    if (action.kind === "openDatePicker") {
+      slashShowDatePicker = true;
+      return;
+    }
+    if (action.kind === "insertText") {
+      replaceSlashWithText(action.text);
+      closeSlashMenu();
+    }
+  }
+
+  function onPickDate(iso: string) {
+    replaceSlashWithText(iso);
+    closeSlashMenu();
+  }
+
+  /**
+   * Replace the slash command (e.g. `/today`) the user just typed with
+   * the date label, surrounded by enough newlines to make a clean
+   * separator from the content above. Uses execCommand so the change
+   * lands in the browser's native undo stack.
+   */
+  function replaceSlashWithText(text: string) {
+    if (!textareaEl || slashStart === null) return;
+    const before = textareaEl.value.slice(0, slashStart);
+    const trailingNewlines = (before.match(/\n*$/)?.[0] ?? "").length;
+    let payload = text;
+    if (before.length > 0 && trailingNewlines < 2) {
+      payload = "\n".repeat(2 - trailingNewlines) + payload;
+    }
+    payload += "\n";
+
+    textareaEl.setSelectionRange(slashStart, textareaEl.selectionStart);
+    let ok = false;
+    try {
+      ok = document.execCommand("insertText", false, payload);
+    } catch {
+      ok = false;
+    }
+    if (!ok) {
+      // Fallback for browsers that no longer accept execCommand on
+      // textareas. Loses undo for this single insertion.
+      const after = textareaEl.value.slice(textareaEl.selectionEnd);
+      const next = before + payload + after;
+      textareaEl.value = next;
+      const cursor = before.length + payload.length;
+      textareaEl.setSelectionRange(cursor, cursor);
+      textareaEl.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+  }
+
+  onMount(() => {
+    // Initial value gets set after loadOrMigrate (which assigns content
+    // and pushes into textareaEl.value).
+    autoResize();
+  });
+</script>
+
+<svelte:head>
+  <title>{`Diary · SimpleJournal`}</title>
+</svelte:head>
+
+<main class="mx-auto min-h-screen max-w-3xl px-4 py-6 sm:px-6">
+  {#if loading}
+    <p class="text-sm text-slate-500">
+      {migrating ? "Reorganizing your old entries…" : "Loading…"}
+    </p>
+  {:else if error}
+    <p class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-100">
+      {error}
+    </p>
+  {:else}
+    <textarea
+      bind:this={textareaEl}
+      class="min-h-[60vh] w-full resize-none border-none bg-transparent p-0 text-base leading-relaxed focus:outline-none focus:ring-0"
+      placeholder=""
+      oninput={onContentInput}
+      onkeydown={onTextareaKeydown}
+      onkeyup={onTextareaKeyup}
+      onclick={onTextareaClick}
+      onblur={() => {
+        setTimeout(() => {
+          if (!textareaEl || document.activeElement !== textareaEl) {
+            closeSlashMenu();
+          }
+        }, 100);
+      }}
+      autocomplete="off"
+      spellcheck="true"
+    ></textarea>
+  {/if}
+</main>
+
+{#if slashOpen}
+  <SlashMenu
+    suggestions={slashSuggestions}
+    selectedIndex={slashSelectedIdx}
+    showDatePicker={slashShowDatePicker}
+    top={slashPos.top}
+    left={slashPos.left}
+    onSelectSuggestion={applySuggestion}
+    onPickDate={onPickDate}
+    onClose={closeSlashMenu}
+  />
+{/if}

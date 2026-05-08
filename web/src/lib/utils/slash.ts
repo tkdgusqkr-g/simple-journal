@@ -1,20 +1,20 @@
 /**
- * Slash command engine for the entry textarea.
+ * Slash command engine for the diary editor.
  *
- * Notion-style: typing `/` opens a popup with date-related commands; the
- * selected command inserts a new entry (or jumps to an existing one).
+ * Each diary is a single scrolling text document. The slash command
+ * just inserts a date label as plain text at the cursor — there is no
+ * separate "entry" backing each date any more.
  *
- * Commands:
- *   /today       — create or jump to today's entry
- *   /yesterday   — create or jump to yesterday's entry
+ *   /today       — insert today's ISO date (YYYY-MM-DD)
+ *   /yesterday   — insert yesterday's ISO date
  *   /date        — open a mini calendar to pick any date
- *   /YYYY-MM-DD  — direct ISO date input
+ *   /YYYY-MM-DD  — insert that date directly
  */
 
 import { isValidIsoDate, todayIso, yesterdayIso } from "./date.js";
 
 export type SlashAction =
-  | { kind: "createDate"; date: string }
+  | { kind: "insertText"; text: string }
   | { kind: "openDatePicker" };
 
 export interface SlashCommand {
@@ -30,16 +30,16 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   {
     id: "today",
     label: "Today",
-    hint: "Insert today's entry",
+    hint: "Insert today's date",
     tokens: ["today", "tod", "t"],
-    resolve: () => ({ kind: "createDate", date: todayIso() }),
+    resolve: () => ({ kind: "insertText", text: todayIso() }),
   },
   {
     id: "yesterday",
     label: "Yesterday",
-    hint: "Insert yesterday's entry",
+    hint: "Insert yesterday's date",
     tokens: ["yesterday", "yes", "y"],
-    resolve: () => ({ kind: "createDate", date: yesterdayIso() }),
+    resolve: () => ({ kind: "insertText", text: yesterdayIso() }),
   },
   {
     id: "date",
@@ -57,9 +57,6 @@ export const SLASH_COMMANDS: SlashCommand[] = [
  * Notion-style: any `/` opens the menu regardless of surrounding text.
  * The "query" is everything from the `/` up to the cursor, stopping at
  * whitespace so the menu hides as soon as the user types a space.
- *
- * Limit scan length so a one-off slash deep in a long paragraph
- * doesn't keep matching forever.
  */
 export interface SlashTrigger {
   slashIndex: number;
@@ -100,7 +97,7 @@ export function suggestionsFor(query: string): SlashSuggestion[] {
         id: `iso-${q}`,
         label: q,
         hint: "Insert this date",
-        resolve: () => ({ kind: "createDate", date: q }),
+        resolve: () => ({ kind: "insertText", text: q }),
       },
       ...SLASH_COMMANDS,
     ];
