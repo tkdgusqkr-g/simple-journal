@@ -4,6 +4,10 @@
   import { ApiError } from "$lib/api/client";
   import { authStore } from "$lib/auth/store.svelte";
   import { entriesApi } from "$lib/api/diaries";
+  import {
+    readDiaryCache,
+    writeDiaryCache,
+  } from "$lib/utils/cache";
   import { todayIso } from "$lib/utils/date";
   import { debounce } from "$lib/utils/debounce";
   import {
@@ -24,6 +28,11 @@
   let migrating = $state(false);
   let error = $state<string | null>(null);
 
+  // Set when the user types — prevents the background server refresh
+  // from clobbering in-progress edits if the cached version was
+  // already shown.
+  let userTyped = $state(false);
+
   // Slash menu state
   let slashStart = $state<number | null>(null);
   let slashQuery = $state("");
@@ -43,6 +52,7 @@
     try {
       const updated = await entriesApi.update(entry.id, { content });
       entry = updated;
+      writeDiaryCache(diaryId, updated);
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) return;
       console.warn("[diary save] failed:", err);
@@ -56,18 +66,41 @@
   }
 
   /**
-   * Load (and if necessary, migrate) the diary's single backing entry.
+   * Two-phase load.
    *
-   * The new model stores each diary as one big text document. For an
-   * existing diary that still has multiple per-date entries from the
-   * old model, we concatenate them chronologically (with ISO date
-   * markers) into the oldest entry, then delete the rest. This runs
-   * once per diary.
+   * Phase 1 (sync): If we have a cached copy of this diary's entry in
+   * localStorage, surface it immediately so the user sees their writing
+   * with no perceived delay. The textarea and editor are usable right
+   * away.
+   *
+   * Phase 2 (async): Hit the server in the background. Three cases:
+   *   • Server returns the same entry id with newer content (someone else
+   *     edited it) AND the user hasn't started typing in this session —
+   *     adopt the server version.
+   *   • Server returns multiple entries (old per-date model) — perform
+   *     the one-time merge migration.
+   *   • Server returns nothing (fresh diary) — create the empty entry.
    */
   async function loadOrMigrate() {
     if (!diaryId) return;
-    loading = true;
     error = null;
+
+    // Phase 1 — instant paint from cache, if present.
+    const cached = readDiaryCache(diaryId);
+    if (cached) {
+      entry = cached.entry;
+      content = cached.entry.content;
+      loading = false;
+      requestAnimationFrame(() => {
+        if (textareaEl) {
+          textareaEl.value = content;
+          autoResize();
+        }
+      });
+    }
+
+    // Phase 2 — fetch from server in the background (no `await`-blocked
+    // first paint when we already painted from cache).
     try {
       const all: Entry[] = [];
       let cursor: string | null = null;
@@ -80,17 +113,15 @@
         cursor = res.nextCursor;
       } while (cursor);
 
+      let serverEntry: Entry;
       if (all.length === 0) {
-        const created = await entriesApi.upsert(diaryId, {
+        serverEntry = await entriesApi.upsert(diaryId, {
           date: todayIso(),
           content: "",
           tags: [],
         });
-        entry = created;
-        content = "";
       } else if (all.length === 1) {
-        entry = all[0]!;
-        content = entry.content;
+        serverEntry = all[0]!;
       } else {
         migrating = true;
         const sorted = all.slice().sort((a, b) => a.date.localeCompare(b.date));
@@ -104,7 +135,7 @@
           .filter((s): s is string => s !== null)
           .join("\n\n");
 
-        const updated = await entriesApi.update(main.id, { content: merged });
+        serverEntry = await entriesApi.update(main.id, { content: merged });
         await Promise.all(
           others.map((e) =>
             entriesApi.remove(e.id).catch(() => {
@@ -112,17 +143,42 @@
             }),
           ),
         );
-        entry = updated;
-        content = merged;
         migrating = false;
       }
 
-      if (textareaEl) {
-        textareaEl.value = content;
-        autoResize();
+      writeDiaryCache(diaryId, serverEntry);
+
+      // Reconcile with what's already on screen.
+      const cacheStillCurrent =
+        cached &&
+        cached.entry.id === serverEntry.id &&
+        cached.entry.content === serverEntry.content;
+
+      if (!cached || !cacheStillCurrent) {
+        // Server has a different version (or no cache at all). Only
+        // adopt it if the user hasn't started typing — otherwise the
+        // upcoming save will eventually push their text up.
+        if (!userTyped) {
+          entry = serverEntry;
+          content = serverEntry.content;
+          if (textareaEl) {
+            textareaEl.value = content;
+            autoResize();
+          }
+        } else {
+          // Keep entry.id pointer in sync (so save() targets the right
+          // row) but leave content alone.
+          entry = { ...serverEntry, content };
+        }
+      } else {
+        entry = serverEntry;
       }
     } catch (err) {
-      error = err instanceof Error ? err.message : "failed to load diary";
+      if (!cached) {
+        error = err instanceof Error ? err.message : "failed to load diary";
+      }
+      // If we already painted from cache, network errors are silent —
+      // the user can keep working offline; the next save will retry.
     } finally {
       loading = false;
     }
@@ -219,6 +275,7 @@
   function onContentInput() {
     if (!textareaEl) return;
     content = textareaEl.value;
+    userTyped = true;
     autoResize();
     save();
     refreshSlashState();

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { authStore } from "$lib/auth/store.svelte";
   import { diariesApi } from "$lib/api/diaries";
+  import { clearDiaryCache } from "$lib/utils/cache";
   import type { Diary, DiaryType } from "@simple-journal/shared-types/domain";
 
   let diaries = $state<Diary[]>([]);
@@ -54,6 +55,7 @@
     try {
       await diariesApi.remove(d.id);
       diaries = diaries.filter((x) => x.id !== d.id);
+      clearDiaryCache(d.id);
     } catch (err) {
       error = err instanceof Error ? err.message : "failed to delete diary";
     }
