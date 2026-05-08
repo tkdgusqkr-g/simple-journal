@@ -23,6 +23,12 @@
     onPickDate,
     onClose,
   }: Props = $props();
+
+  let calendarRef = $state<MiniCalendar | null>(null);
+
+  export function handleCalendarKey(event: KeyboardEvent): boolean {
+    return calendarRef?.handleKey(event) ?? false;
+  }
 </script>
 
 <svelte:window
@@ -39,7 +45,7 @@
   style:left={`${left}px`}
 >
   {#if showDatePicker}
-    <MiniCalendar onPick={onPickDate} />
+    <MiniCalendar bind:this={calendarRef} onPick={onPickDate} onKeyClose={onClose} />
   {:else if suggestions.length > 0}
     <ul
       class="w-64 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900"

@@ -9,11 +9,13 @@
 
   interface Props {
     onPick: (iso: string) => void;
+    onKeyClose?: () => void;
   }
 
-  let { onPick }: Props = $props();
+  let { onPick, onKeyClose }: Props = $props();
 
   let month = $state<Date>(startOfMonth(new Date()));
+  let cursor = $state<Date>(new Date());
   const today = new Date();
   const weekdays = ["S", "M", "T", "W", "T", "F", "S"];
 
@@ -45,15 +47,46 @@
     }
     return out;
   });
+
+  function moveCursor(days: number) {
+    const next = new Date(cursor);
+    next.setDate(next.getDate() + days);
+    cursor = next;
+    // Switch month view if cursor leaves current month
+    if (next.getMonth() !== month.getMonth() || next.getFullYear() !== month.getFullYear()) {
+      month = startOfMonth(next);
+    }
+  }
+
+  export function handleKey(event: KeyboardEvent): boolean {
+    switch (event.key) {
+      case "ArrowLeft":
+        moveCursor(-1);
+        return true;
+      case "ArrowRight":
+        moveCursor(1);
+        return true;
+      case "ArrowUp":
+        moveCursor(-7);
+        return true;
+      case "ArrowDown":
+        moveCursor(7);
+        return true;
+      case "Enter":
+        onPick(toIso(cursor));
+        return true;
+      case "Escape":
+        onKeyClose?.();
+        return true;
+      default:
+        return false;
+    }
+  }
 </script>
 
 <div
   class="w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-lg dark:border-slate-700 dark:bg-slate-900"
   onmousedown={(e) => {
-    /* Keep focus on the parent textarea — otherwise the textarea
-       blur fires, closeSlashMenu runs after a short delay, slashStart
-       becomes null, and the date selection can't replace the original
-       `/date` text. */
     e.preventDefault();
   }}
   role="presentation"
@@ -62,6 +95,7 @@
     <button
       type="button"
       class="rounded p-1 text-slate-500 transition hover:bg-slate-100 dark:hover:bg-slate-800"
+      onmousedown={(e) => e.preventDefault()}
       onclick={() => (month = addMonths(month, -1))}
       aria-label="Previous month"
     >
@@ -71,6 +105,7 @@
     <button
       type="button"
       class="rounded p-1 text-slate-500 transition hover:bg-slate-100 dark:hover:bg-slate-800"
+      onmousedown={(e) => e.preventDefault()}
       onclick={() => (month = addMonths(month, 1))}
       aria-label="Next month"
     >
@@ -88,13 +123,16 @@
     {#each cells as cell}
       {@const iso = toIso(cell.date)}
       {@const isToday = isSameDay(cell.date, today)}
+      {@const isCursor = isSameDay(cell.date, cursor)}
       <button
         type="button"
         onmousedown={(e) => e.preventDefault()}
         onclick={() => onPick(iso)}
         class:opacity-30={!cell.inMonth}
-        class:ring-2={isToday}
-        class:ring-blue-400={isToday}
+        class:ring-2={isToday && !isCursor}
+        class:ring-blue-400={isToday && !isCursor}
+        class:bg-blue-500={isCursor}
+        class:text-white={isCursor}
         class="flex aspect-square items-center justify-center rounded text-xs transition hover:bg-blue-100 dark:hover:bg-slate-800"
       >
         {cell.date.getDate()}

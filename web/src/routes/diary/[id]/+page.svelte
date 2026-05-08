@@ -19,6 +19,8 @@
   import SlashMenu from "$lib/components/SlashMenu.svelte";
   import type { Entry } from "@simple-journal/shared-types/domain";
 
+  let slashMenuRef = $state<SlashMenu | null>(null);
+
   const diaryId = $derived(page.params.id as string);
 
   let entry = $state<Entry | null>(null);
@@ -257,10 +259,8 @@
   function onTextareaKeydown(event: KeyboardEvent) {
     if (!slashOpen) return;
     if (slashShowDatePicker) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        closeSlashMenu();
-      }
+      const handled = slashMenuRef?.handleCalendarKey(event);
+      if (handled) event.preventDefault();
       return;
     }
     if (event.key === "ArrowDown") {
@@ -402,6 +402,7 @@
 
 {#if slashOpen}
   <SlashMenu
+    bind:this={slashMenuRef}
     suggestions={slashSuggestions}
     selectedIndex={slashSelectedIdx}
     showDatePicker={slashShowDatePicker}
