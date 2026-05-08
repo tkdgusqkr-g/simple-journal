@@ -47,7 +47,17 @@
   });
 </script>
 
-<div class="w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+<div
+  class="w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-lg dark:border-slate-700 dark:bg-slate-900"
+  onmousedown={(e) => {
+    /* Keep focus on the parent textarea — otherwise the textarea
+       blur fires, closeSlashMenu runs after a short delay, slashStart
+       becomes null, and the date selection can't replace the original
+       `/date` text. */
+    e.preventDefault();
+  }}
+  role="presentation"
+>
   <div class="flex items-center justify-between">
     <button
       type="button"
@@ -80,6 +90,7 @@
       {@const isToday = isSameDay(cell.date, today)}
       <button
         type="button"
+        onmousedown={(e) => e.preventDefault()}
         onclick={() => onPick(iso)}
         class:opacity-30={!cell.inMonth}
         class:ring-2={isToday}

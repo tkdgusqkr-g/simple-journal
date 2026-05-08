@@ -41,6 +41,10 @@
   let slashShowDatePicker = $state(false);
   let slashPos = $state({ top: 0, left: 0 });
 
+  // Stored offset from textarea content origin (scroll-independent)
+  let slashCaretOffsetTop = 0;
+  let slashCaretOffsetLeft = 0;
+
   const slashSuggestions = $derived(
     slashStart !== null ? suggestionsFor(slashQuery) : [],
   );
@@ -66,27 +70,10 @@
     textareaEl.style.height = `${Math.max(textareaEl.scrollHeight, 200)}px`;
   }
 
-  /**
-   * Two-phase load.
-   *
-   * Phase 1 (sync): If we have a cached copy of this diary's entry in
-   * localStorage, surface it immediately so the user sees their writing
-   * with no perceived delay. The textarea and editor are usable right
-   * away.
-   *
-   * Phase 2 (async): Hit the server in the background. Three cases:
-   *   • Server returns the same entry id with newer content (someone else
-   *     edited it) AND the user hasn't started typing in this session —
-   *     adopt the server version.
-   *   • Server returns multiple entries (old per-date model) — perform
-   *     the one-time merge migration.
-   *   • Server returns nothing (fresh diary) — create the empty entry.
-   */
   async function loadOrMigrate() {
     if (!diaryId) return;
     error = null;
 
-    // Phase 1 — instant paint from cache, if present.
     const cached = readDiaryCache(diaryId);
     if (cached) {
       entry = cached.entry;
@@ -100,8 +87,6 @@
       });
     }
 
-    // Phase 2 — fetch from server in the background (no `await`-blocked
-    // first paint when we already painted from cache).
     try {
       const all: Entry[] = [];
       let cursor: string | null = null;
@@ -139,9 +124,7 @@
         serverEntry = await entriesApi.update(main.id, { content: merged });
         await Promise.all(
           others.map((e) =>
-            entriesApi.remove(e.id).catch(() => {
-              // best-effort — leftover stale entries are harmless
-            }),
+            entriesApi.remove(e.id).catch(() => {}),
           ),
         );
         migrating = false;
@@ -149,16 +132,12 @@
 
       writeDiaryCache(diaryId, serverEntry);
 
-      // Reconcile with what's already on screen.
       const cacheStillCurrent =
         cached &&
         cached.entry.id === serverEntry.id &&
         cached.entry.content === serverEntry.content;
 
       if (!cached || !cacheStillCurrent) {
-        // Server has a different version (or no cache at all). Only
-        // adopt it if the user hasn't started typing — otherwise the
-        // upcoming save will eventually push their text up.
         if (!userTyped) {
           entry = serverEntry;
           content = serverEntry.content;
@@ -167,8 +146,6 @@
             autoResize();
           }
         } else {
-          // Keep entry.id pointer in sync (so save() targets the right
-          // row) but leave content alone.
           entry = { ...serverEntry, content };
         }
       } else {
@@ -178,8 +155,6 @@
       if (!cached) {
         error = err instanceof Error ? err.message : "failed to load diary";
       }
-      // If we already painted from cache, network errors are silent —
-      // the user can keep working offline; the next save will retry.
     } finally {
       loading = false;
     }
@@ -218,16 +193,6 @@
     slashSelectedIdx = 0;
   }
 
-  /**
-   * Position the slash menu just below the caret line — not below the
-   * whole textarea (which can be hundreds of lines tall).
-   *
-   * Uses the standard "mirror div" technique: we render a hidden div
-   * that copies the textarea's text-layout-affecting styles, fill it
-   * with the text up to the slash position, and measure where a marker
-   * span lands. That gives us the caret's pixel offset within the
-   * textarea, which we add to the textarea's viewport rect.
-   */
   function computeMenuPos(
     ta: HTMLTextAreaElement,
     caretIndex: number,
@@ -254,24 +219,29 @@
 
     mirror.textContent = ta.value.substring(0, caretIndex);
     const marker = document.createElement("span");
-    marker.textContent = "​"; // zero-width space
+    marker.textContent = "";
     mirror.appendChild(marker);
     document.body.appendChild(mirror);
 
-    const taRect = ta.getBoundingClientRect();
     const mirrorRect = mirror.getBoundingClientRect();
     const markerRect = marker.getBoundingClientRect();
-    const offsetTop = markerRect.top - mirrorRect.top;
-    const offsetLeft = markerRect.left - mirrorRect.left;
     const lineHeight =
       parseFloat(computed.lineHeight) ||
       parseFloat(computed.fontSize) * 1.4;
 
     document.body.removeChild(mirror);
 
+    slashCaretOffsetTop = markerRect.top - mirrorRect.top + lineHeight + 4;
+    slashCaretOffsetLeft = markerRect.left - mirrorRect.left;
+
+    return getViewportPos(ta);
+  }
+
+  function getViewportPos(ta: HTMLTextAreaElement): { top: number; left: number } {
+    const taRect = ta.getBoundingClientRect();
     return {
-      top: taRect.top + offsetTop - ta.scrollTop + lineHeight + 4,
-      left: taRect.left + offsetLeft - ta.scrollLeft,
+      top: taRect.top + slashCaretOffsetTop - ta.scrollTop,
+      left: taRect.left + slashCaretOffsetLeft - ta.scrollLeft,
     };
   }
 
@@ -349,12 +319,6 @@
     closeSlashMenu();
   }
 
-  /**
-   * Replace the slash command (e.g. `/today`) the user just typed with
-   * the date label, surrounded by enough newlines to make a clean
-   * separator from the content above. Uses execCommand so the change
-   * lands in the browser's native undo stack.
-   */
   function replaceSlashWithText(text: string) {
     if (!textareaEl || slashStart === null) return;
     const end = slashEnd ?? textareaEl.selectionStart;
@@ -388,10 +352,15 @@
     save();
   }
 
+  function onWindowScroll() {
+    if (!slashOpen || !textareaEl) return;
+    slashPos = getViewportPos(textareaEl);
+  }
+
   onMount(() => {
-    // Initial value gets set after loadOrMigrate (which assigns content
-    // and pushes into textareaEl.value).
     autoResize();
+    window.addEventListener("scroll", onWindowScroll, true);
+    return () => window.removeEventListener("scroll", onWindowScroll, true);
   });
 </script>
 
@@ -424,9 +393,6 @@
             closeSlashMenu();
           }
         }, 150);
-      }}
-      onscroll={() => {
-        if (slashOpen) closeSlashMenu();
       }}
       autocomplete="off"
       spellcheck="true"
