@@ -10,7 +10,7 @@ import {
   NotFoundError,
   ValidationError,
 } from "./errors.js";
-import { newDiaryId, newInviteToken, nowIso } from "./ids.js";
+import { newDiaryId, newInviteToken } from "./ids.js";
 
 export class DiaryService {
   constructor(private readonly db: Database) {}

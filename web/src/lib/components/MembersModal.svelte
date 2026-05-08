@@ -81,7 +81,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-  onmousedown|self={onClose}
+  onmousedown={(e) => { if (e.target === e.currentTarget) onClose(); }}
 >
   <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-700 dark:bg-slate-900">
     <div class="flex items-center justify-between">

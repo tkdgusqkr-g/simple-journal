@@ -27,7 +27,7 @@
   $effect(() => {
     if (authStore.status === "authenticated" && token) {
       void accept();
-    } else if (authStore.status === "unauthenticated") {
+    } else if (authStore.status === "anonymous") {
       goto(`/login?redirect=/invite/${token}`);
     }
   });
