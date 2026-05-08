@@ -59,10 +59,8 @@
               "flex w-full items-center justify-between px-3 py-2 text-left text-sm transition " +
               (i === selectedIndex ? "bg-blue-50 dark:bg-blue-950" : "")
             }
-            onmousedown={(e) => {
-              e.preventDefault();
-              onSelectSuggestion(s);
-            }}
+            onmousedown={(e) => e.preventDefault()}
+            onclick={() => onSelectSuggestion(s)}
             role="option"
             aria-selected={i === selectedIndex}
           >
