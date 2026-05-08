@@ -2,6 +2,7 @@ import type {
   Diary,
   DiaryMember,
   DiaryRole,
+  DiaryType,
   Entry,
   ISODate,
   User,
@@ -178,10 +179,13 @@ export class D1DatabaseAdapter implements Database {
     return toDiary(row);
   }
 
-  async updateDiary(id: string, patch: { name?: string }): Promise<Diary> {
+  async updateDiary(id: string, patch: { name?: string; type?: DiaryType }): Promise<Diary> {
+    const set: Partial<typeof schema.diaries.$inferInsert> = {};
+    if (patch.name) set.name = patch.name;
+    if (patch.type) set.type = patch.type;
     const [row] = await this.db
       .update(schema.diaries)
-      .set({ name: patch.name })
+      .set(set)
       .where(eq(schema.diaries.id, id))
       .returning();
     if (!row) throw new Error(`updateDiary: no diary ${id}`);

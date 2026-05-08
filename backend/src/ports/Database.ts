@@ -81,7 +81,7 @@ export interface Database {
   listDiariesForUser(userId: string): Promise<Diary[]>;
   getDiaryById(id: string): Promise<Diary | null>;
   createDiary(input: CreateDiaryInput): Promise<Diary>;
-  updateDiary(id: string, patch: { name?: string }): Promise<Diary>;
+  updateDiary(id: string, patch: { name?: string; type?: DiaryType }): Promise<Diary>;
   deleteDiary(id: string): Promise<void>;
 
   // Members

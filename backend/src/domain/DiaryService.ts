@@ -47,6 +47,11 @@ export class DiaryService {
     return this.db.updateDiary(id, { name: trimmed });
   }
 
+  async changeType(id: string, userId: string, type: DiaryType): Promise<Diary> {
+    await this.requireRole(id, userId, ["owner"]);
+    return this.db.updateDiary(id, { type });
+  }
+
   async remove(id: string, userId: string): Promise<void> {
     await this.requireRole(id, userId, ["owner"]);
     await this.db.deleteDiary(id);

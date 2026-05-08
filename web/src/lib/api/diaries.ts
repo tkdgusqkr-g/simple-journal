@@ -22,6 +22,11 @@ export const diariesApi = {
       .patch<{ diary: Diary }>(`/api/diaries/${id}`, { name })
       .then((r) => r.diary),
 
+  changeType: (id: string, type: DiaryType) =>
+    apiClient
+      .patch<{ diary: Diary }>(`/api/diaries/${id}`, { type })
+      .then((r) => r.diary),
+
   remove: (id: string) =>
     apiClient.delete<{ deleted: boolean }>(`/api/diaries/${id}`),
 

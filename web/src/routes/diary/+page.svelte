@@ -60,6 +60,15 @@
       error = err instanceof Error ? err.message : "failed to delete diary";
     }
   }
+  async function onToggleType(d: Diary) {
+    const newType = d.type === "personal" ? "shared" : "personal";
+    try {
+      const updated = await diariesApi.changeType(d.id, newType);
+      diaries = diaries.map((x) => (x.id === d.id ? updated : x));
+    } catch (err) {
+      error = err instanceof Error ? err.message : "failed to change type";
+    }
+  }
 </script>
 
 <svelte:head>
@@ -139,9 +148,14 @@
           >
             <div class="flex items-center justify-between gap-2">
               <h2 class="truncate font-semibold tracking-tight">{diary.name}</h2>
-              <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800">
+              <button
+                type="button"
+                onclick={(e) => { e.preventDefault(); e.stopPropagation(); void onToggleType(diary); }}
+                class="rounded-full bg-slate-100 px-2 py-0.5 text-xs uppercase tracking-wide text-slate-500 transition hover:bg-blue-100 hover:text-blue-600 dark:bg-slate-800 dark:hover:bg-blue-950 dark:hover:text-blue-400"
+                title="Click to toggle type"
+              >
                 {diary.type}
-              </span>
+              </button>
             </div>
             <p class="mt-2 text-xs text-slate-500">
               Created {new Date(diary.createdAt).toLocaleDateString()}
