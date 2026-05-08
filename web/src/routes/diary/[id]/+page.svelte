@@ -412,6 +412,7 @@
       onclick={onTextareaClick}
       onblur={() => {
         setTimeout(() => {
+          if (slashShowDatePicker) return;
           if (!textareaEl || document.activeElement !== textareaEl) {
             closeSlashMenu();
           }
