@@ -36,7 +36,7 @@
     type="button"
     onclick={() => (showMembers = true)}
     title="Manage members"
-    class="fixed right-4 top-4 z-30 rounded-full bg-white p-2 text-slate-500 shadow-md transition hover:bg-blue-50 hover:text-blue-600 dark:bg-slate-900 dark:hover:bg-blue-950"
+    class="fixed bottom-4 right-4 z-30 rounded-full bg-white p-2 text-slate-500 shadow-md transition hover:bg-blue-50 hover:text-blue-600 dark:bg-slate-900 dark:hover:bg-blue-950"
   >
     👥
   </button>
