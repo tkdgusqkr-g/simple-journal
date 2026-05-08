@@ -146,7 +146,7 @@
       slashStart = trig.slashIndex;
       slashQuery = trig.query;
       if (isFresh) slashSelectedIdx = 0;
-      slashPos = computeMenuPos(textareaEl);
+      slashPos = computeMenuPos(textareaEl, trig.slashIndex);
     } else {
       closeSlashMenu();
     }
@@ -159,12 +159,61 @@
     slashSelectedIdx = 0;
   }
 
-  function computeMenuPos(ta: HTMLTextAreaElement): {
-    top: number;
-    left: number;
-  } {
-    const rect = ta.getBoundingClientRect();
-    return { top: rect.bottom + 4, left: rect.left + 8 };
+  /**
+   * Position the slash menu just below the caret line — not below the
+   * whole textarea (which can be hundreds of lines tall).
+   *
+   * Uses the standard "mirror div" technique: we render a hidden div
+   * that copies the textarea's text-layout-affecting styles, fill it
+   * with the text up to the slash position, and measure where a marker
+   * span lands. That gives us the caret's pixel offset within the
+   * textarea, which we add to the textarea's viewport rect.
+   */
+  function computeMenuPos(
+    ta: HTMLTextAreaElement,
+    caretIndex: number,
+  ): { top: number; left: number } {
+    const computed = window.getComputedStyle(ta);
+    const mirror = document.createElement("div");
+    const ms = mirror.style;
+    ms.position = "absolute";
+    ms.visibility = "hidden";
+    ms.top = "0";
+    ms.left = "0";
+    ms.whiteSpace = "pre-wrap";
+    ms.wordWrap = "break-word";
+    ms.boxSizing = computed.boxSizing;
+    ms.width = computed.width;
+    ms.padding = computed.padding;
+    ms.border = computed.border;
+    ms.fontFamily = computed.fontFamily;
+    ms.fontSize = computed.fontSize;
+    ms.fontWeight = computed.fontWeight;
+    ms.lineHeight = computed.lineHeight;
+    ms.letterSpacing = computed.letterSpacing;
+    ms.tabSize = computed.tabSize;
+
+    mirror.textContent = ta.value.substring(0, caretIndex);
+    const marker = document.createElement("span");
+    marker.textContent = "​"; // zero-width space
+    mirror.appendChild(marker);
+    document.body.appendChild(mirror);
+
+    const taRect = ta.getBoundingClientRect();
+    const mirrorRect = mirror.getBoundingClientRect();
+    const markerRect = marker.getBoundingClientRect();
+    const offsetTop = markerRect.top - mirrorRect.top;
+    const offsetLeft = markerRect.left - mirrorRect.left;
+    const lineHeight =
+      parseFloat(computed.lineHeight) ||
+      parseFloat(computed.fontSize) * 1.4;
+
+    document.body.removeChild(mirror);
+
+    return {
+      top: taRect.top + offsetTop - ta.scrollTop + lineHeight + 4,
+      left: taRect.left + offsetLeft - ta.scrollLeft,
+    };
   }
 
   function onContentInput() {
