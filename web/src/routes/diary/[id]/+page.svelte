@@ -35,6 +35,7 @@
 
   // Slash menu state
   let slashStart = $state<number | null>(null);
+  let slashEnd = $state<number | null>(null);
   let slashQuery = $state("");
   let slashSelectedIdx = $state(0);
   let slashShowDatePicker = $state(false);
@@ -200,6 +201,7 @@
       const isFresh =
         slashStart !== trig.slashIndex || slashQuery !== trig.query;
       slashStart = trig.slashIndex;
+      slashEnd = textareaEl.selectionStart;
       slashQuery = trig.query;
       if (isFresh) slashSelectedIdx = 0;
       slashPos = computeMenuPos(textareaEl, trig.slashIndex);
@@ -210,6 +212,7 @@
 
   function closeSlashMenu() {
     slashStart = null;
+    slashEnd = null;
     slashQuery = "";
     slashShowDatePicker = false;
     slashSelectedIdx = 0;
@@ -354,6 +357,7 @@
    */
   function replaceSlashWithText(text: string) {
     if (!textareaEl || slashStart === null) return;
+    const end = slashEnd ?? textareaEl.selectionStart;
     const before = textareaEl.value.slice(0, slashStart);
     const trailingNewlines = (before.match(/\n*$/)?.[0] ?? "").length;
     let payload = text;
@@ -362,7 +366,8 @@
     }
     payload += "\n";
 
-    textareaEl.setSelectionRange(slashStart, textareaEl.selectionStart);
+    textareaEl.focus();
+    textareaEl.setSelectionRange(slashStart, end);
     let ok = false;
     try {
       ok = document.execCommand("insertText", false, payload);
@@ -370,15 +375,17 @@
       ok = false;
     }
     if (!ok) {
-      // Fallback for browsers that no longer accept execCommand on
-      // textareas. Loses undo for this single insertion.
-      const after = textareaEl.value.slice(textareaEl.selectionEnd);
+      const after = textareaEl.value.slice(end);
       const next = before + payload + after;
       textareaEl.value = next;
       const cursor = before.length + payload.length;
       textareaEl.setSelectionRange(cursor, cursor);
       textareaEl.dispatchEvent(new Event("input", { bubbles: true }));
     }
+    content = textareaEl.value;
+    userTyped = true;
+    autoResize();
+    save();
   }
 
   onMount(() => {
@@ -412,11 +419,14 @@
       onclick={onTextareaClick}
       onblur={() => {
         setTimeout(() => {
-          if (slashShowDatePicker) return;
+          if (slashOpen) return;
           if (!textareaEl || document.activeElement !== textareaEl) {
             closeSlashMenu();
           }
-        }, 100);
+        }, 150);
+      }}
+      onscroll={() => {
+        if (slashOpen) closeSlashMenu();
       }}
       autocomplete="off"
       spellcheck="true"
